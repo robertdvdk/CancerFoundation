@@ -33,3 +33,6 @@ Make sure you have [Conda](https://docs.conda.io/projects/conda/en/latest/user-g
 
 ## Generate embeddings
 Please consult ```tutorial/embeddings_tutorial.ipynb``` for a tutorial on how to generate embeddings with CancerGPT for your scRNA-seq data.
+
+## Drug response prediction
+Refer to ```drug_response_prediction/README.md``` for instructions on performing drug response prediction.
