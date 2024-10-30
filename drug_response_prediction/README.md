@@ -27,16 +27,16 @@ Make sure you have [Conda](https://docs.conda.io/projects/conda/en/latest/user-g
 
 Run the following command for drug response prediction on hold-out cell lines for **CancerGPT** embeddings.
 ```bash
-   python drp.py --embedding_path "./data/embedding/CancerGPT_embedding.csv" --gpu_id 0
-   ```
+python drp.py --embedding_path "./data/embedding/CancerGPT_embedding.csv" --gpu_id 0
+```
 For **scFoundation** embeddings, use:
 ```bash
-   python drp.py --embedding_path "./data/embedding/scFoundation_embedding.csv" --gpu_id 0
-   ```
+python drp.py --embedding_path "./data/embedding/scFoundation_embedding.csv" --gpu_id 0
+```
 For **raw gene expression** data (DeepCDR), use:
 ```bash
-   python drp.py --embedding_path "./data/embedding/gene_expression.csv" --gpu_id 0
-   ```
+python drp.py --embedding_path "./data/embedding/gene_expression.csv" --gpu_id 0
+```
 
 Alternatively, download the results from the link specified in Step 4. Corresponding plots can be generated using the `plot.ipynb`notebook.
 
