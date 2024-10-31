@@ -1,4 +1,4 @@
-name: cancergpt
+name: cancerfoundation
 channels:
   - pytorch
   - nvidia
