@@ -25,7 +25,7 @@ Make sure you have [Conda](https://docs.conda.io/projects/conda/en/latest/user-g
    ```
 3. **Activate environment**:
    ```bash
-   conda activate cancergpt
+   conda activate cancerfoundation
    ```
 4. **Download pretrained model weights**:
 
