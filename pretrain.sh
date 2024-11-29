@@ -27,9 +27,8 @@ accelerate launch --config-file="./config.yaml"\
     --trunc-by-sample \
     --loss "mse" \
     --vocab $VOCAB_PATH \
-    --train-path "./train" \
-    --eval-path "./eval" \
+    --train-path "./example" \
+    --eval-path "./example" \
     --zero-percentages 0.2 0.4 0.6 \
     --conditions "technology" \
-    --balance-primary "tissue" \
-    --balance-secondary "technology"
+    --balance-primary "technology"

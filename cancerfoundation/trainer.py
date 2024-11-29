@@ -430,8 +430,6 @@ class Trainer:
 
                 conditions_batch = data_dict["conditions"] if self.conditions else None
 
-                print(conditions_batch)
-
                 if self.USE_GENERATIVE_TRAINING:
                     pcpt_gene = data_dict["pcpt_gene"]
                     pcpt_expr = data_dict["pcpt_expr"]
