@@ -1,4 +1,4 @@
-name: cancerfoundation
+name: cancerfoundation_training
 channels:
   - pytorch
   - nvidia

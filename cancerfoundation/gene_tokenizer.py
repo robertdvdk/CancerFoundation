@@ -2,7 +2,7 @@ import json
 import pickle
 from pathlib import Path
 from collections import Counter, OrderedDict
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Union
 from typing_extensions import Self
 
 import torchtext.vocab as torch_vocab
