@@ -20,13 +20,13 @@ Make sure you have [Conda](https://docs.conda.io/projects/conda/en/latest/user-g
    ```bash
    conda activate cancerfoundation
    ```
-4. **Download pretrained model weights**:
+4. **Download example dataset**:
 
-   Please download an exemplary training dataset from [this link](https://polybox.ethz.ch/index.php/s/ANH0oCX4Mkw4Nos), unzip it, and place it in this directory.
+   Please download an example training dataset from [this link](https://polybox.ethz.ch/index.php/s/ANH0oCX4Mkw4Nos), unzip it, and place it in this directory.
 
 ## Training
 
-To start an exemplary training run as a SLURM job, call:
+To start an example training run, call:
 ```bash
 bash pretrain.sh
 ```
