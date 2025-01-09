@@ -13,6 +13,3 @@ RUN apt-get install -y r-base tzdata
 
 ADD requirements.txt .
 RUN pip install -r requirements.txt
-
-
-CMD

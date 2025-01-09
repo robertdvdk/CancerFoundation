@@ -49,6 +49,7 @@ torch==2.2.1
 torchdata==0.7.1
 torchtext==0.17.1
 tqdm==4.66.5
+transformers==4.46.3
 triton==2.2.0
 tzdata==2024.2
 umap-learn==0.5.6
