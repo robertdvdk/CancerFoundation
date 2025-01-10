@@ -530,23 +530,23 @@ class Trainer:
                         loss_conditions /= len(self.conditions)
                         loss += loss_conditions
 
-                if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
-                    previous_cell_embs = output_dict["cell_emb"].detach()
-                    preds = self.model(
-                        pcpt_gene,
-                        pcpt_expr,
-                        pcpt_key_padding_mask,
-                        gen_gene,
-                        gen_key_padding_mask,
-                        MVC=False,
-                        input_cell_emb=previous_cell_embs,
-                        generative_training=True,
-                        conditions=conditions_batch
-                    )["gen_preds"]
+                # if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
+                #     previous_cell_embs = output_dict["cell_emb"].detach()
+                #     preds = self.model(
+                #         pcpt_gene,
+                #         pcpt_expr,
+                #         pcpt_key_padding_mask,
+                #         gen_gene,
+                #         gen_key_padding_mask,
+                #         MVC=False,
+                #         input_cell_emb=previous_cell_embs,
+                #         generative_training=True,
+                #         conditions=conditions_batch
+                #     )["gen_preds"]
 
-                    loss_gen = criterion(
-                        preds, gen_expr_target, positions_to_match)
-                    loss = loss + loss_gen
+                #     loss_gen = criterion(
+                #         preds, gen_expr_target, positions_to_match)
+                #     loss = loss + loss_gen
                 self.accelerator.backward(loss)
 
                 if self.accelerator.sync_gradients:
