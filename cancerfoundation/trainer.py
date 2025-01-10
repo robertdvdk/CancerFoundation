@@ -546,7 +546,7 @@ class Trainer:
 
                     loss_gen = criterion(
                         preds, gen_expr_target, positions_to_match)
-                    loss = loss + loss_gen + 0.0 * torch.sum(p.sum() for p in self.model.mvc_decoder.parameters())
+                    loss = loss + loss_gen
                 self.accelerator.backward(loss)
 
                 if self.accelerator.sync_gradients:
