@@ -10,4 +10,4 @@ RUN apt-get install -y git
 
 RUN python -m pip install --upgrade pip
 ADD requirements.txt .
-#RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt
