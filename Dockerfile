@@ -10,6 +10,6 @@ RUN apt-get install -y git
 
 # Install r-base and tzdata
 RUN apt-get install -y r-base tzdata
-
+RUN python -m pip install --upgrade pip
 ADD requirements.txt .
 RUN pip install -r requirements.txt
