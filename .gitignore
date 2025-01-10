@@ -14,3 +14,5 @@ __pycache__/
 save
 example
 .conda
+training_data/data
+training_data/.cache
