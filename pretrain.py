@@ -3,6 +3,10 @@ import sys
 from accelerate import Accelerator
 import os 
 
+from accelerate import DistributedDataParallelKwargs
+
+
+
 if __name__ == "__main__":
     sys.path.insert(0, "../")
     from utils import get_args
@@ -12,7 +16,8 @@ if __name__ == "__main__":
 
 
     args = get_args()
-    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, log_with="wandb")
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, log_with="wandb", kwargs_handlers=[ddp_kwargs])
 
     trainer = Trainer(
         args=args,
