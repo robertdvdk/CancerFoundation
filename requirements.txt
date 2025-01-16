@@ -6,4 +6,6 @@ scanpy==1.10.3
 scib-metrics==0.5.1
 tqdm
 transformers==4.46.3
+wandb
+jupyter
 
