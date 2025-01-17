@@ -65,6 +65,8 @@ def scale_proportions_balanced(proportions, scale_factor, max_scale=5):
     return final_values
 
 def get_balanced_sampler(dataset, primary_condition: str, secondary_condition: Optional[str] = None, oversample: bool=True):
+    if os.path.exists("sampler.pth"):
+        return torch.load("sampler.pth")
     class_counts = Counter([dataset.get_metadata(i)[primary_condition] for i in range(len(dataset))])
 
     max_class = max(class_counts.values())
@@ -107,5 +109,6 @@ def get_balanced_sampler(dataset, primary_condition: str, secondary_condition: O
             sample_weights.append(class_weights[data[primary_condition]][data[secondary_condition]])
     else:
         sample_weights = [class_weights[dataset.get_metadata(i)[primary_condition]] for i in range(len(dataset))]
-
+    
+    torch.save(sampler, 'sampler.pth')
     return WeightedRandomSampler(weights=sample_weights, num_samples=round(total_count) if oversample else len(sample_weights), replacement=True)
