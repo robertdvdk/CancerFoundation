@@ -2,7 +2,7 @@ from collections import Counter
 from typing import Optional
 import os
 from torch.utils.data import WeightedRandomSampler
-
+import torch
 
 def scale_proportions_balanced(proportions, scale_factor, max_scale=5):
     if scale_factor == 1:
