@@ -57,15 +57,15 @@ class scDataset(torch.utils.data.Dataset):
         ).flatten()
 
         gene_data_np = np.memmap(
-            os.path.join(data_dir, "rna_X.data.bin"), 
+            os.path.join(data_dir, "gene_X.data.bin"), 
             dtype=np.float32, mode='r', 
         )
         gene_indices_np = np.memmap(
-            os.path.join(data_dir, "rna_X.indices.bin"), 
+            os.path.join(data_dir, "gene_X.indices.bin"), 
             dtype=np.int32, mode='r', 
         )
         gene_indptr_np = np.memmap(
-            os.path.join(data_dir, "rna_X.indptr.bin"),
+            os.path.join(data_dir, "gene_X.indptr.bin"),
             dtype=np.int32, mode='r',
         )
         start = gene_indptr_np[cell_id]
