@@ -11,3 +11,15 @@ __pycache__/
 
 # VSCode settings
 .vscode/
+training_data/.cache
+training_data/data
+training_data/downloads
+
+save
+example
+
+*.png
+*.h5ad
+*.csv
+*.pth
+*.tar
