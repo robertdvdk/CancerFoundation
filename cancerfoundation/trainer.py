@@ -18,7 +18,7 @@ import numpy as np
 from safetensors import safe_open
 from .loss import LossType
 
-
+from torch.nn.parallel import DistributedDataParallel
 
 
 def with_sdp_kernel(func):
@@ -135,7 +135,6 @@ class Trainer:
             raise ValueError("balance_secondary is not allowed to be set (not None) if balance_primary is None.")
         self.balance_primary = balance_primary
         self.balance_secondary = balance_secondary
-
         self.zero_percentages = zero_percentages
 
         self.gene_expr_loss = get_loss(
@@ -286,7 +285,11 @@ class Trainer:
             self.train_loader,
             self.eval_loader,
         )
-
+        
+        if isinstance(self.model, DistributedDataParallel):
+            self.model._set_static_graph()
+            
+            
     def __setup_training_variables(self, epochs: int) -> None:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 

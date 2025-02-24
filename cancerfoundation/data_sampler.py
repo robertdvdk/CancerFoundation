@@ -109,6 +109,6 @@ def get_balanced_sampler(dataset, primary_condition: str, secondary_condition: O
             sample_weights.append(class_weights[data[primary_condition]][data[secondary_condition]])
     else:
         sample_weights = [class_weights[dataset.get_metadata(i)[primary_condition]] for i in range(len(dataset))]
-    
+    sampler = WeightedRandomSampler(weights=sample_weights, num_samples=round(total_count) if oversample else len(sample_weights), replacement=True)
     torch.save(sampler, 'sampler.pth')
-    return WeightedRandomSampler(weights=sample_weights, num_samples=round(total_count) if oversample else len(sample_weights), replacement=True)
+    return sampler
