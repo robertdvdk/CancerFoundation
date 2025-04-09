@@ -1,13 +1,11 @@
 from typing import List, Mapping, Optional
+
 import torch
 import re
-
 
 def load_pretrained(
     model: torch.nn.Module,
     pretrained_params: Mapping[str, torch.Tensor],
-    strict: bool = False,
-    prefix: Optional[List[str]] = None,
     verbose: bool = True,
 ) -> torch.nn.Module:
     """
@@ -24,7 +22,7 @@ def load_pretrained(
     Returns:
         torch.nn.Module: The model with pretrained weights.
     """
-
+    
     model_new_params = model.state_dict()
 
     not_identical = []
@@ -36,19 +34,18 @@ def load_pretrained(
         else:
             if key in model_new_params.keys():
                 if verbose:
-                    print(
-                        f"Same key but not same shape: {model_new_params[key].shape} : {pretrained_params[key].shape}")
+                    print(f"Same key but not same shape: {model_new_params[key].shape} : {pretrained_params[key].shape}")
             not_identical.append(key)
 
     def modify_string(input_string):
         # Pattern to check if the string has the required format
-        check_pattern = r"^encoder\.layers\.\d+\.self_attn\.self_attn\..*"
-
+        check_pattern = r"^transformer_encoder\.layers\.\d+\.self_attn\.self_attn\..*"
+        
         # Check if the input string matches the pattern
         if re.match(check_pattern, input_string):
             # Pattern to perform the replacement
-            modify_pattern = r"(encoder\.layers\.\d+\.self_attn\.)self_attn\.(.*)"
-
+            modify_pattern = r"(transformer_encoder\.layers\.\d+\.self_attn\.)self_attn\.(.*)"
+            
             # Replace the matched pattern with the required modification
             modified_string = re.sub(modify_pattern, r"\1\2", input_string)
             return modified_string
@@ -61,7 +58,7 @@ def load_pretrained(
             model_new_params[key_new] = pretrained_params[key]
             updated.append(key_new)
             not_identical.remove(key)
-
+    
     if verbose and len(not_identical) > 0:
         print("Couldn't load following keys: ", not_identical)
 

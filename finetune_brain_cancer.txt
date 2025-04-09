@@ -1,0 +1,66 @@
+Setting CUDA_VISIBLE_DEVICES to: 2
+
+which python
+/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/bin/python
+starting script
+/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/accelerate/accelerator.py:498: UserWarning: `log_with=wandb` was passed but no supported trackers are currently installed.
+  warnings.warn(f"`log_with={log_with}` was passed but no supported trackers are currently installed.")
+/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/contextlib.py:105: FutureWarning: `torch.backends.cuda.sdp_kernel()` is deprecated. In the future, this context manager will be removed. Please see `torch.nn.attention.sdpa_kernel()` for the new context manager, with updated signature.
+  self.gen = func(*args, **kwds)
+cancerfoundation.trainer
+/cluster/work/boeva/atheus/CancerFoundation_training_bionemo/cancerfoundation/trainer.py
+Epoch: 0
+Training...
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Examples saved to 'examples.pkl'. Exiting.
+Traceback (most recent call last):
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1243, in _try_get_data
+    data = self._data_queue.get(timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/multiprocessing/queues.py", line 114, in get
+    raise Empty
+_queue.Empty
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/cluster/work/boeva/atheus/CancerFoundation_training_bionemo/pretrain.py", line 67, in <module>
+    trainer.train(epoch, log_interval=args.log_interval)
+  File "/cluster/work/boeva/atheus/CancerFoundation_training_bionemo/cancerfoundation/trainer.py", line 30, in wrapped_func
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/cluster/work/boeva/atheus/CancerFoundation_training_bionemo/cancerfoundation/trainer.py", line 413, in train
+    for batch, data_dict in enumerate(active_dataloader):
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/accelerate/data_loader.py", line 566, in __iter__
+    current_batch = next(dataloader_iter)
+                    ^^^^^^^^^^^^^^^^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
+    data = self._next_data()
+           ^^^^^^^^^^^^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1448, in _next_data
+    idx, data = self._get_data()
+                ^^^^^^^^^^^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1412, in _get_data
+    success, data = self._try_get_data()
+                    ^^^^^^^^^^^^^^^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/torch/utils/data/dataloader.py", line 1256, in _try_get_data
+    raise RuntimeError(
+RuntimeError: DataLoader worker (pid(s) 480130, 480192, 480254, 480316, 480317, 480440, 480502, 480568) exited unexpectedly
+Traceback (most recent call last):
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/bin/accelerate", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/accelerate/commands/accelerate_cli.py", line 48, in main
+    args.func(args)
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/accelerate/commands/launch.py", line 1194, in launch_command
+    simple_launcher(args)
+  File "/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/lib/python3.12/site-packages/accelerate/commands/launch.py", line 780, in simple_launcher
+    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
+subprocess.CalledProcessError: Command '['/cluster/apps/biomed/boeva/atheus/conda/envs/cancerfoundation/bin/python', 'pretrain.py', '--save-dir', './save/cancerfoundation-Apr08-18-00-2025', '--max-seq-len', '1200', '--batch-size', '16', '--eval-batch-size', '16', '--nlayers', '6', '--nheads', '8', '--embsize', '128', '--d-hi', '128', '--grad-accu-steps', '4', '--epochs', '10', '--lr', '0.0001', '--warmup-ratio-or-step', '10000', '--log-interval', '16', '--trunc-by-sample', '--loss', 'mse', '--vocab', './vocab.json', '--train-path', '../CancerFoundation_training_bionemo_2/data', '--eval-path', '../CancerFoundation_training_bionemo_2/data', '--zero-percentages', '0.2', '0.4', '0.6']' returned non-zero exit status 1.
