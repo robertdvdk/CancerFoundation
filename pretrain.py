@@ -3,7 +3,7 @@ import sys
 from accelerate import Accelerator
 import os 
 
-if __name__ == "__main__":
+def main():
     sys.path.insert(0, "../")
     from utils import get_args
     from cancerfoundation.trainer import Trainer
@@ -33,15 +33,14 @@ if __name__ == "__main__":
         scheduler_factor=args.scheduler_factor,
         save_dir=args.save_dir,
         accelerator=accelerator,
-        vocab=args.vocab,
         loss_type=args.loss,
+        do_dat=args.do_dat,
         resume_from_checkpoint=args.resume_from_checkpoint,
         wandb = args.wandb,
         conditions = args.conditions,
         mvc_decoder_style=args.mvc_decoder_style,
         scale_zero_expression=args.scale_zero_expression,
-        train_data_path=args.train_path,
-        eval_data_path=args.eval_path,
+        data_path=args.train_path,
         zero_percentages=args.zero_percentages,
         balance_primary=args.balance_primary,
         balance_secondary=args.balance_secondary,
@@ -67,3 +66,8 @@ if __name__ == "__main__":
         trainer.checkpoint(epoch)
     
     accelerator.end_training()
+
+
+
+if __name__ == "__main__":
+    main()

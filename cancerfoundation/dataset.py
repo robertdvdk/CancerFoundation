@@ -1,94 +1,113 @@
-from typing import OrderedDict
+from typing import Optional
 from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
 from torch.utils.data import Dataset
-import polars as pl
 import torch
 
-class scDataset(Dataset):
-    def __init__(self, path: str, vocab: str, cache_size: int = 32):
+from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
+from bionemo.scdl.io.single_cell_collection import SingleCellCollection
+
+from torch.utils.data import Dataset
+
+import json
+
+from pathlib import Path
+import scanpy as sc
+import pandas as pd
+
+import torch
+import numpy as np
+from torch.utils.data import Subset
+
+
+#TODO: Move from_h5ads to its own script!
+
+
+class DatasetDir:
+    
+    VOCAB_PATH = "vocab.json"
+    MEMMAP_PATH = "mem.map"
+    MAPPING_PATH = "mapping.json"
+    OBS_PATH = "obs.parquet"
+    
+    def __init__(self, data_dir: str):
+        self.data_dir = Path(data_dir)
+    
+    def validate(self):
+        return all([
+            self.vocab_path.is_file(),
+            self.obs_path.is_file(),
+            self.mapping_path.is_file(),
+            self.memmap_path.is_file()
+        ])
+    
+    def mkdir(self):
+        self.data_dir.mkdir(exist_ok=True, parents=True)
+    
+    @property
+    def memmap_path(self):
+        return self.data_dir / self.MEMMAP_PATH
+    
+    @property
+    def mapping_path(self):
+        return self.data_dir /self.MAPPING_PATH
+    
+    @property
+    def vocab_path(self):
+        return self.data_dir / self.VOCAB_PATH
+    
+    @property
+    def obs_path(self):
+        return self.data_dir / self.OBS_PATH
+        
+
+
+
+
+class SingleCellDataset(Dataset):
+    GENE_ID = "_cf_gene_id"
+    CLS_TOKEN = "<cls>"
+    PAD_TOKEN = "<pad>"
+    
+    def __init__(self, data_dir: str, pad_value: float = -1., obs_columns: Optional[list[str]]=None):
         super().__init__()
+        self.data_dir = DatasetDir(data_dir)
+        self.vocab = self._load_vocab()
+        self.pad_value = pad_value
+        self.memmap = SingleCellMemMapDataset(self.data_dir.memmap_path)
+        self.obs = pd.read_parquet(self.data_dir.obs_path)
+        self.mapping = self._load_mapping()
+        self.obs_columns = obs_columns
 
-        self.path = path
-
-        # Load and join index + metadata, then convert to list of dicts
-        index = pl.read_ndjson(f"{path}/index.jsonl")
-        metadata = pl.read_json(f"{path}/metadata.json")
-        self.obs = index.join(metadata, on="path", how="left").to_dicts()
-
-        # Load vocab (already a plain dict)
-        self.gene_vocab = pl.read_json(vocab)[0].to_dict(as_series=False)
-
-        # genes.json is already a dict: {path: [genes]}
-        self.genes = pl.read_json(f"{path}/genes.json").to_dicts()[0]
-
-        # encodings.json is a dict of {feature_name: [[encodings]]}
-        self.encodings = pl.read_json(f"{path}/encodings.json").to_dicts()[0]
-
-        self._memmap_cache = OrderedDict()
-        self._memmap_cache_size = cache_size
-
-        self.gene_indices = {}
-        for path, gene_list in self.genes.items():
-            mapped = [
-                self.gene_vocab[name][0]
-                for name in gene_list
-                if name in self.gene_vocab
-            ]
-            reverse_index = [
-                i for i, name in enumerate(gene_list)
-                if name in self.gene_vocab
-            ]
-            self.gene_indices[path] = (mapped, reverse_index)
-
+        assert self.memmap.number_of_rows() == self.obs.shape[0]
+        
+        
+    def _load_mapping(self) -> dict[str, int]:
+        with self.data_dir.mapping_path.open("r") as f:
+            mapping = json.load(f)
+        return mapping
+    
+    def _load_vocab(self) -> dict[str, int]:
+        with open(self.data_dir.vocab_path, "r") as f:
+            vocab = json.load(f)
+        return vocab
+    
+    def get_metadata(self, key: str) -> np.array:
+        return self.obs[key].values
+    
     def __len__(self):
-        return len(self.obs)
-
-    def get_memmap(self, path):
-        if path in self._memmap_cache:
-            self._memmap_cache.move_to_end(path)  # Mark as recently used
-            return self._memmap_cache[path]
-
-        memmap = SingleCellMemMapDataset(path)
-
-        # Add new memmap to cache
-        self._memmap_cache[path] = memmap
-        if len(self._memmap_cache) > self._memmap_cache_size:
-            self._memmap_cache.popitem(last=False)  # Remove least recently used
-
-        return memmap
-
-    def get_metadata(self, index: int):
-        row = self.obs[index]
-        out = {}
-        for key in self.encodings:
-            if key in row and row[key] is not None:
-                out[key] = self.encodings[key][0][row[key]]
-        return out
-
-    def __getitem__(self, index: int):
-        row = self.obs[index]
-        path = row["path"]
-        cell_idx = row["cell_index"]
-
-        expressions = self.get_memmap(path).get_row_padded(cell_idx)[0]
-        gene_names = self.genes[path]
-        dense_expressions = torch.as_tensor(expressions)
-
-        out_genes, valid_indices = self.gene_indices[path]
-        if out_genes:
-            out_expressions = dense_expressions[list(valid_indices)]
-        else:
-            out_genes = []
-            out_expressions = torch.tensor([])
-
-        out = {
-            "expressions": out_expressions,
-            "genes": list(out_genes),
-        }
-
-        for key in self.encodings:
-            if key in row and row[key] is not None:
-                out[key] = self.encodings[key][row[key]]
-
-        return out
-
+        return self.memmap.number_of_rows()
+    
+    def __getitem__(self, index: int) -> dict[str, int | torch.Tensor]:
+        exp, genes = self.memmap.get_row_padded(index, return_features=True, feature_vars=[self.GENE_ID])
+        genes = np.insert(genes[0], 0, self.vocab["<cls>"])
+        exp = np.insert(exp, 0, self.pad_value)
+        data = {"expressions": torch.Tensor(exp).type(torch.float32), "genes": torch.from_numpy(genes)}
+        if self.obs_columns is None:
+            return data
+        
+        row = self.obs.iloc[index]
+        for column in self.obs_columns:
+            data[column] = row[column]
+            
+        return data
+    

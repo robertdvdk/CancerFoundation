@@ -1,9 +1,12 @@
 from collections import Counter
 from typing import Optional
 
+import numpy as np
 import torch
 from torch.utils.data import WeightedRandomSampler
 
+from cancerfoundation.dataset import SingleCellDataset
+from torch.utils.data import Subset
 
 def scale_proportions_balanced(proportions, scale_factor, max_scale=5):
     if scale_factor == 1:
@@ -65,9 +68,13 @@ def scale_proportions_balanced(proportions, scale_factor, max_scale=5):
 
     return final_values
 
-def get_balanced_sampler(dataset, primary_condition: str, secondary_condition: Optional[str] = None, oversample: bool=True):
-    print("got here")
-    class_counts = Counter([dataset.get_metadata(i)[primary_condition] for i in range(len(dataset))])
+def get_balanced_sampler(dataset: Subset, primary_condition: str, secondary_condition: Optional[str] = None, oversample: bool=True):
+    
+    primary = dataset.dataset.get_metadata(primary_condition)[dataset.indices]
+    if secondary_condition is not None:
+        secandary = dataset.dataset.get_metadata(secondary_condition)[dataset.indices]
+        
+    class_counts = Counter(primary)
 
     max_class = max(class_counts.values())
     
@@ -84,7 +91,7 @@ def get_balanced_sampler(dataset, primary_condition: str, secondary_condition: O
 
         total_count += target_count
 
-        if secondary_condition == None:
+        if secondary_condition is None:
             class_weights[class_label] = target_count / count
         else:
             data_2 = []
@@ -108,7 +115,5 @@ def get_balanced_sampler(dataset, primary_condition: str, secondary_condition: O
             data = dataset.get_metadata(i)
             sample_weights.append(class_weights[data[primary_condition]][data[secondary_condition]])
     else:
-        sample_weights = [class_weights[dataset.get_metadata(i)[primary_condition]] for i in range(len(dataset))]
-    torch.save(WeightedRandomSampler(weights=sample_weights, num_samples=round(total_count) if oversample else len(sample_weights), replacement=True), 'sampler.pth')
-    exit()
+        sample_weights = np.vectorize(class_weights.get)(primary)
     return WeightedRandomSampler(weights=sample_weights, num_samples=round(total_count) if oversample else len(sample_weights), replacement=True)

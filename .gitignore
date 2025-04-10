@@ -10,13 +10,14 @@ __pycache__/
 .ipynb_checkpoints/
 
 # VSCode settings
-.vscode/
 training_data/.cache
 training_data/data
 training_data/downloads
 
-save
-example
+save/
+example/
+c_data/
+new_test/
 
 *.png
 *.h5ad

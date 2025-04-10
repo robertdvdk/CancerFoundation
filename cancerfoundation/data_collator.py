@@ -3,7 +3,6 @@ from typing import Dict, List, Mapping, Optional, Tuple
 
 import torch
 import numpy as np
-import pickle
 from .preprocess import binning
 
 
@@ -55,7 +54,6 @@ class AnnDataCollator:
     reserve_keys: List[str] = field(default_factory=lambda: [])
     keep_first_n_tokens: int = 1
     data_style: str = "pcpt"
-    cls_token_id: Optional[int] = None
     n_bins: int = None
     conditions: List[str] = None
     cls_predictions: List[str] = None
@@ -92,10 +90,6 @@ class AnnDataCollator:
             raise ValueError(
                 "`data_style` must be one of 'pcpt', 'gen', 'both'.")
         
-        if self.cls_token_id != None and self.keep_first_n_tokens < 1:
-            raise ValueError(
-                "If `cls_token_id` is supplied, then `keep_first_n_tokens` must be at least 1.")
-        
         if self.do_binning != (self.n_bins != None):
             raise ValueError(
                 "`do_binning` and `n_bins` have to be set in tandem.")
@@ -115,42 +109,29 @@ class AnnDataCollator:
             :obj:`Dict[str, torch.Tensor]`: a dict of tensors.
         """
 
-        with open("examples.pkl", "wb") as f:
-            pickle.dump(examples, f)
-
-        print("Examples saved to 'examples.pkl'. Exiting.")
-        exit()
-
         if len(self.reserve_keys) > 0:
             assert all(key in examples[0] for key in self.reserve_keys), (
                 f"reserve_keys must be a subset of the keys in the examples. "
                 f"Got {self.reserve_keys} but expected keys in {list(examples[0].keys())}."
             )
 
-        examples_input = [{
-            "id": None,
-            "genes": torch.cat((torch.tensor([self.cls_token_id]), torch.tensor(examples[i][f"genes"]).to(dtype=torch.int))),
-            "expressions": torch.cat((torch.tensor([self.pad_value]),examples[i]["expressions"].float())),
-        } for i in range(len(examples))]
-
-
         if self.data_style == "pcpt":
-            data_dict = self._call_pcpt(examples_input)
+            data_dict = self._call_pcpt(examples)
         elif self.data_style == "gen":
-            data_dict = self._call_gen(examples_input)
+            data_dict = self._call_gen(examples)
         elif self.data_style == "both":
-            data_dict = self._call_both(examples_input)
+            data_dict = self._call_both(examples)
 
         # add reserved keys
-        device = examples_input[0]["genes"].device
+        device = examples[0]["genes"].device
         for key in self.reserve_keys:
-            data_ = [example[key] for example in examples_input]
+            data_ = [example[key] for example in examples]
             data_dict[key] = torch.stack(data_, dim=0).to(device)
         
         if self.conditions:
             data_dict["conditions"] = {}
             for condition in self.conditions:
-                data_dict["conditions"][condition] = torch.tensor([d[condition] for d in examples]).unsqueeze(1).to(device)
+                data_dict["conditions"][condition] = torch.LongTensor([d[condition] for d in examples]).to(device)
 
         return data_dict
 

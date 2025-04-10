@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.distributions import Bernoulli
 from tqdm import trange
-from .grad_reverse import GradReverse
+from .grad_reverse import grad_reverse
 
 from .layers import CFLayer, CFGenerator
 
@@ -887,14 +887,13 @@ class AdversarialDiscriminator(nn.Module):
             self._decoder.append(activation())
             self._decoder.append(nn.LayerNorm(d_model))
         self.out_layer = nn.Linear(d_model, n_cls)
-        self.gradient_modifer = GradReverse
 
     def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Tensor, shape [batch_size, embsize]
         """
-        x = self.gradient_modifer(x, lambd=1.0)
+        x = grad_reverse(x, scale=1.0)
         for layer in self._decoder:
             x = layer(x)
         return self.out_layer(x)

@@ -9,7 +9,7 @@ import torch
 import json
 
 from .data_collator import AnnDataCollator
-from .dataset import scDataset
+from .dataset import SingleCellDataset
 from .utils import load_pretrained
 from .model import TransformerModel
 from cancerfoundation.loss import criterion_neg_log_bernoulli, get_loss, masked_relative_error
@@ -18,7 +18,8 @@ from safetensors import safe_open
 from .loss import LossType
 
 from torch.nn.parallel import DistributedDataParallel
-
+from torch.utils.data import random_split
+from accelerate.utils.tqdm import tqdm
 
 def with_sdp_kernel(func):
     def wrapped_func(*args, **kwargs):
@@ -54,9 +55,7 @@ class Trainer:
         scheduler_interval: int,
         scheduler_factor: float,
         save_dir: str,
-        vocab: str,
-        train_data_path: Union[str, os.PathLike],
-        eval_data_path: Union[str, os.PathLike],
+        data_path: Union[str, os.PathLike],
         loss_type: LossType = LossType.MSE,
         resume_from_checkpoint: str = None,
         wandb: str = None,
@@ -103,10 +102,7 @@ class Trainer:
         )
         self.domain_nums = None
 
-        with open(vocab, 'r') as file:
-            vocab_dict = json.load(file)
-        self.pad_token_id = vocab_dict[self.pad_token] # DO THIS
-        self.cls_token_id = vocab_dict[self.cls_token] # DO THIS
+     
 
         self.explicit_zero_prob = explicit_zero_prob
 
@@ -142,13 +138,26 @@ class Trainer:
         self.gene_expr_loss = get_loss(
             loss_type=loss_type, num_classes=self.n_input_bins if self.n_input_bins else None, scale_zero_expression=scale_zero_expression)
         
-        self.train_loader = None
-        self.eval_loader = None
+        self.dataset = self.__create_datasets(data_path=data_path)
+        
+        if self.conditions:
+            self.conditions_nums = {}
+            for cond in self.conditions:
+                self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
+        
+        self.train_dataset, self.eval_dataset = random_split(self.dataset, [0.9, 0.1])
+        self.vocab = self.dataset.vocab
+        
+        self.pad_token_id = self.vocab["<pad>"]
+        self.cls_token_id = self.vocab["<cls>"]
+        
+        self.train_sampler = self._get_random_sampler(self.train_dataset, True)
+        self.eval_sampler = self._get_random_sampler(self.eval_dataset, False)
+        
+        self.train_loader = self._get_dataloader(self.train_dataset, self.train_sampler, train=True)
+        self.eval_loader = self._get_dataloader(self.eval_dataset, self.eval_sampler, train=False)
 
-        self.train_loader = self.__create_datasets(data_path=train_data_path, train=True, vocab=vocab)
-        self.eval_loader = self.__create_datasets(data_path=eval_data_path, train=False, vocab=vocab)
-
-        self.__set_model(mvc_decoder_style=mvc_decoder_style, gene_expr_out_dim=self.gene_expr_loss.get_in_dim(), ntoken=len(vocab_dict.keys()))
+        self.__set_model(mvc_decoder_style=mvc_decoder_style, gene_expr_out_dim=self.gene_expr_loss.get_in_dim(), ntoken=len(self.vocab.keys()))
 
     def __initiate_wandb(self, run_id: str = None):
         assert (self.resume_from_checkpoint != None) == (run_id != None)
@@ -170,67 +179,58 @@ class Trainer:
     def __create_datasets(
         self,
         data_path: Union[str, os.PathLike],
-        train: bool,
-        vocab: str,
+        
     ):
-        collator = AnnDataCollator(
-            do_padding=True if self.max_seq_len is not None else False,
-            pad_token_id=self.pad_token_id,
-            pad_value=self.pad_value,
-            do_mlm=True,
-            do_binning=True if self.input_style == "binned" else False,
-            mlm_probability=self.mask_ratio,
-            mask_value=self.mask_value,
-            max_length=self.max_seq_len,
-            sampling=self.TRUNC_BY_SAMPLE,
-            data_style=self.training_tasks,
-            cls_token_id=self.cls_token_id,
-            n_bins=self.n_bins if self.input_style == "binned" else None,
-            conditions=self.conditions,
-            zero_percentages=self.zero_percentages,
-        )
-
-        if not (self.conditions or self.balance_primary or self.balance_secondary):
-            obs_keys = None
-        else:
-            obs_keys = []
-            if self.conditions:
-                obs_keys += self.conditions
-            if self.balance_primary:
-                obs_keys.append(self.balance_primary)
-                if self.balance_secondary:
-                    obs_keys.append(self.balance_secondary)
-            obs_keys = list(set(obs_keys))
-
         with self.accelerator.main_process_first():
-            dataset = scDataset(
-                path = data_path,
-                vocab=vocab,
+            dataset = SingleCellDataset(
+                data_dir=data_path,
+                pad_value=self.pad_value,
+                obs_columns=self.conditions
             )
 
-            if train and self.conditions:
-                self.conditions_nums = {}
-                for cond in self.conditions:
-                    self.conditions_nums[cond] = dataset.get_metadata_cardinality(cond)
-
-            batch_size = self.batch_size if train else self.eval_batch_size
-
+        return dataset
+    
+    def _get_random_sampler(self, dataset, train):
+        
+         with self.accelerator.main_process_first():
             if self.balance_primary and train:
                 sampler = get_balanced_sampler(dataset, primary_condition=self.balance_primary, secondary_condition=self.balance_secondary, oversample=True)
             else:
                 sampler = RandomSampler(dataset) if train else SequentialSampler(dataset)
-            
-            return DataLoader(
-                dataset,
-                batch_size=batch_size,
-                sampler=sampler,
-                collate_fn=collator,
-                drop_last=False,
-                num_workers=min(
-                    len(os.sched_getaffinity(0)), batch_size), ## REPLACE LATER
-                pin_memory=True,
-                prefetch_factor=4,
+            return sampler
+        
+        
+    def _get_dataloader(self, dataset, sampler, train: bool):
+        with self.accelerator.main_process_first():
+            collator = AnnDataCollator(
+                do_padding=self.max_seq_len is not None,
+                pad_token_id=self.pad_token_id,
+                pad_value=self.pad_value,
+                do_mlm=True,
+                do_binning=self.input_style == "binned",
+                mlm_probability=self.mask_ratio,
+                mask_value=self.mask_value,
+                max_length=self.max_seq_len,
+                sampling=self.TRUNC_BY_SAMPLE,
+                data_style=self.training_tasks,
+                n_bins=self.n_bins if self.input_style == "binned" else None,
+                conditions=self.conditions,
+                zero_percentages=self.zero_percentages,
             )
+
+            batch_size = self.batch_size if train else self.eval_batch_size
+
+        
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=sampler,
+            collate_fn=collator,
+            drop_last=train,
+            num_workers=min(
+                 len(os.sched_getaffinity(0)), batch_size//2), ## REPLACE LATER
+            pin_memory=True,
+        )
 
     def __set_model(self, mvc_decoder_style: str, gene_expr_out_dim: int, ntoken: int):
 
@@ -321,7 +321,6 @@ class Trainer:
 
         for key, val in metrics.items():
             metrics[key] = val.item()
-        self.accelerator.print("Logging...")
         if self.wandb != None:
             self.accelerator.log(metrics)
         else:
@@ -406,15 +405,13 @@ class Trainer:
             torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
         ]
 
-        num_batches = len(self.train_loader)
-
         active_dataloader = self.train_loader
 
-        for batch, data_dict in enumerate(active_dataloader):
+        for batch, data_dict in tqdm(enumerate(active_dataloader), total=len(active_dataloader)):
+            global_iter = batch + epoch * len(active_dataloader)
             if self.timer == None:
                 self.timer = time.time()
             with self.accelerator.accumulate(self.model):
-                global_iter = (epoch + 1) * num_batches + batch
 
                 conditions_batch = data_dict["conditions"] if self.conditions else None
 
@@ -516,7 +513,6 @@ class Trainer:
                         loss_conditions /= len(self.conditions)
                         loss += loss_conditions
                 
-                """
                 if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
                     previous_cell_embs = output_dict["cell_emb"].detach().clone()
                     preds = self.model(
@@ -534,7 +530,7 @@ class Trainer:
                     loss_gen = criterion(
                         preds, gen_expr_target, positions_to_match)
                     loss = loss + loss_gen
-                """
+                
                 self.accelerator.backward(loss)
 
                 if self.accelerator.sync_gradients:
@@ -633,7 +629,7 @@ class Trainer:
 
         valid_loader = self.eval_loader
         with torch.no_grad():
-            for batch, data_dict in enumerate(valid_loader):
+            for batch, data_dict in tqdm(enumerate(valid_loader), total=len(valid_loader)):
                 conditions_batch = data_dict["conditions"] if self.conditions else None
 
                 if self.USE_GENERATIVE_TRAINING:

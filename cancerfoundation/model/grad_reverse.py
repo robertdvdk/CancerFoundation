@@ -2,12 +2,16 @@ import torch
 from torch.autograd import Function
 
 
-class GradReverse(Function):
+class GradientReverse(Function):
+    scale = 1.0
     @staticmethod
-    def forward(ctx, x: torch.Tensor, lambd: float) -> torch.Tensor:
-        ctx.lambd = lambd
+    def forward(ctx, x):
         return x.view_as(x)
 
     @staticmethod
-    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
-        return grad_output.neg() * ctx.lambd, None
+    def backward(ctx, grad_output):
+        return GradientReverse.scale * grad_output.neg()
+    
+def grad_reverse(x, scale=1.0):
+    GradientReverse.scale = scale
+    return GradientReverse.apply(x)

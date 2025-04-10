@@ -1,0 +1,105 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "cancerfoundation",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "accelerate.commands.launch",
+            "console": "integratedTerminal",
+            "args": [
+                "./pretrain.py",
+                "--save-dir",
+                "./save/cancerfoundation-${input:shortDate}",
+                "--max-seq-len",
+                "1200",
+                "--batch-size",
+                "16",
+                "--do-dat",
+                "--eval-batch-size",
+                "16",
+                "--nlayers",
+                "6",
+                "--nheads",
+                "8",
+                "--embsize",
+                "128",
+                "--d-hi",
+                "128",
+                "--epochs",
+                "10",
+                "--lr",
+                "0.0001",
+                "--warmup-ratio-or-step",
+                "10000",
+                "--log-interval",
+                "16",
+                "--trunc-by-sample",
+                "--loss",
+                "mse",
+                "--conditions",
+                "technology",
+                "--balance-primary",
+                "technology",
+                "--train-path",
+                "debug_data",
+                "--zero-percentages",
+                "0.2",
+                "0.4",
+                "0.6"
+            ],
+            "env": {"ACCELERATE_DEBUG_MODE": "1"}
+        },
+        {
+            "name": "gen_dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/h5ads_to_sc.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--data-path",
+                "dataset_pretraining",
+                "--h5ad-path",
+                "training_data/data/pretraining"
+            ]
+        },
+        {
+            "name": "gen_debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/h5ads_to_sc.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--data-path",
+                "debug_data",
+                "--h5ad-path",
+                "c_data"
+            ]
+        }
+    ],
+"inputs": [
+    {
+      "id": "shortDate",
+      "type": "command",
+      "command": "extension.commandvariable.dateTime",
+      "args": {
+        "locale": "en-US",
+        "options": {
+          "year": "numeric",
+          "month": "2-digit",
+          "day": "2-digit",
+          "hour12": false,
+          "hour": "2-digit",
+          "minute": "2-digit",
+          "second": "2-digit"
+        },
+        "template": "${year}/${month}/${day}-${hour}:${minute}:${second}"
+      }
+    }
+  ]
+}
