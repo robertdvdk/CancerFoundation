@@ -167,6 +167,7 @@ class Trainer:
             init_kwargs={
                 "wandb": (
                     {
+                        "entity": "cancerfoundation",
                         "name": self.save_dir,
                         "resume": "allow",
                     }
@@ -194,7 +195,7 @@ class Trainer:
         
          with self.accelerator.main_process_first():
             if self.balance_primary and train:
-                sampler = get_balanced_sampler(dataset, primary_condition=self.balance_primary, secondary_condition=self.balance_secondary, oversample=True)
+                sampler = get_balanced_sampler(dataset, primary_condition=self.balance_primary, secondary_condition=self.balance_secondary, oversample=False)
             else:
                 sampler = RandomSampler(dataset) if train else SequentialSampler(dataset)
             return sampler
@@ -320,7 +321,10 @@ class Trainer:
     def __log(self, metrics: Dict):
 
         for key, val in metrics.items():
-            metrics[key] = val.item()
+            if hasattr(val, "item"):
+                metrics[key] = val.item()
+            else:
+                metrics[key] = val
         if self.wandb != None:
             self.accelerator.log(metrics)
         else:
@@ -612,6 +616,8 @@ class Trainer:
                         metrics["train/mre"] = cur_error.mean()
                     else:
                         metrics[f"train/{self.loss_type.value}"] = cur_expr.mean()
+                        
+                    metrics["train/lr"] = self.scheduler.get_last_lr()[0]
 
                     self.__log(metrics)
 

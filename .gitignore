@@ -17,6 +17,7 @@ training_data/downloads
 save/
 example/
 training_data/pretraining_data/
+wandb/
 
 *.png
 *.h5ad
