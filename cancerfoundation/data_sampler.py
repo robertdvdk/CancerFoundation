@@ -71,8 +71,9 @@ def scale_proportions_balanced(proportions, scale_factor, max_scale=5):
 def get_balanced_sampler(dataset: Subset, primary_condition: str, secondary_condition: Optional[str] = None, oversample: bool=True):
     
     primary = dataset.dataset.get_metadata(primary_condition)[dataset.indices]
+
     if secondary_condition is not None:
-        secandary = dataset.dataset.get_metadata(secondary_condition)[dataset.indices]
+        secondary = dataset.dataset.get_metadata(secondary_condition)[dataset.indices]
         
     class_counts = Counter(primary)
 
@@ -96,9 +97,8 @@ def get_balanced_sampler(dataset: Subset, primary_condition: str, secondary_cond
         else:
             data_2 = []
             for i in range(len(dataset)):
-                data = dataset.get_metadata(i)
-                if data[primary_condition] == class_label:
-                    data_2.append(data[secondary_condition])
+                if primary[i] == class_label:
+                    data_2.append(secondary[i])
             
             class_counts_2 = list(Counter(data_2).items())
             class_counts_2_balanced = scale_proportions_balanced([class_counts_2_i[1] for class_counts_2_i in class_counts_2], scale_factor=target_count / count)
@@ -108,12 +108,10 @@ def get_balanced_sampler(dataset: Subset, primary_condition: str, secondary_cond
             for i in range(len(class_counts_2_balanced)):
                 class_weights[class_label][class_counts_2[i][0]] = class_counts_2_balanced[i]/class_counts_2[i][1]
 
-    #sample_weights = [class_weights[dataset.get_metadata(i)[primary_condition]][dataset.get_metadata(i)[secondary_condition]] for i in range(len(dataset))] if secondary_condition != None else [class_weights[dataset.get_metadata(i)[primary_condition]] for i in range(len(dataset))]
-    if secondary_condition != None:
+    if secondary_condition is not None:
         sample_weights = []
         for i in range(len(dataset)):
-            data = dataset.get_metadata(i)
-            sample_weights.append(class_weights[data[primary_condition]][data[secondary_condition]])
+            sample_weights.append(class_weights[primary[i]][secondary[i]])
     else:
         sample_weights = np.vectorize(class_weights.get)(primary)
     return WeightedRandomSampler(weights=sample_weights, num_samples=round(total_count) if oversample else len(sample_weights), replacement=True)
