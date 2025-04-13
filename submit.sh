@@ -4,6 +4,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH -p debug
+#SBATCH -A a-a05
+
 
 # Run job step
 
