@@ -354,7 +354,6 @@ class Trainer:
         if pretrained_model_path:
             self.model = self.load_model(pretrained_model_path)
             
-        self.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         self.accelerate()
         if self.resume_from_checkpoint != None:
             self.accelerator.print(
@@ -413,216 +412,215 @@ class Trainer:
             global_iter = batch + epoch * len(active_dataloader)
             if self.timer == None:
                 self.timer = time.time()
-            with self.accelerator.accumulate(self.model):
 
-                conditions_batch = data_dict["conditions"] if self.conditions else None
+            conditions_batch = data_dict["conditions"] if self.conditions else None
 
-                if self.USE_GENERATIVE_TRAINING:
-                    pcpt_gene = data_dict["pcpt_gene"]
-                    pcpt_expr = data_dict["pcpt_expr"]
-                    pcpt_key_padding_mask = pcpt_gene.eq(
-                        self.pad_token_id)
-                    gen_gene = data_dict["gen_gene"]
-                    gen_expr_target = target_values = data_dict["gen_expr_target"]
-                    gen_key_padding_mask = gen_gene.eq(
-                        self.pad_token_id)
-                else:
-                    input_gene_ids = data_dict["gene"]
-                    input_values = data_dict["masked_expr"]
-                    target_values = data_dict["expr"]
-                    src_key_padding_mask = input_gene_ids.eq(
-                        self.pad_token_id)
+            if self.USE_GENERATIVE_TRAINING:
+                pcpt_gene = data_dict["pcpt_gene"]
+                pcpt_expr = data_dict["pcpt_expr"]
+                pcpt_key_padding_mask = pcpt_gene.eq(
+                    self.pad_token_id)
+                gen_gene = data_dict["gen_gene"]
+                gen_expr_target = target_values = data_dict["gen_expr_target"]
+                gen_key_padding_mask = gen_gene.eq(
+                    self.pad_token_id)
+            else:
+                input_gene_ids = data_dict["gene"]
+                input_values = data_dict["masked_expr"]
+                target_values = data_dict["expr"]
+                src_key_padding_mask = input_gene_ids.eq(
+                    self.pad_token_id)
 
-                if self.USE_GENERATIVE_TRAINING:
-                    output_dict = self.model(
-                        pcpt_gene,
-                        pcpt_expr,
-                        pcpt_key_padding_mask,
-                        gen_gene,
-                        gen_key_padding_mask,
-                        MVC=self.MVC,
-                        generative_training=True,
-                        conditions=conditions_batch,
+            if self.USE_GENERATIVE_TRAINING:
+                output_dict = self.model(
+                    pcpt_gene,
+                    pcpt_expr,
+                    pcpt_key_padding_mask,
+                    gen_gene,
+                    gen_key_padding_mask,
+                    MVC=self.MVC,
+                    generative_training=True,
+                    conditions=conditions_batch,
+                )
+                gen_expr_preds = output_values = output_dict["gen_preds"]
+
+                positions_to_match = ~gen_key_padding_mask
+
+                loss = loss_expr = criterion(
+                    gen_expr_preds, gen_expr_target, positions_to_match
+                )
+
+                if self.MVC:
+                    loss_mvc = criterion(
+                        output_dict["mvc_output"][:, pcpt_gene.shape[1]:], gen_expr_target, positions_to_match)
+                    loss = loss + loss_mvc
+                
+                if self.explicit_zero_prob:
+                    loss_zero_log_prob = criterion_neg_log_bernoulli(
+                        output_dict["mlm_zero_probs"], gen_expr_target, positions_to_match
                     )
-                    gen_expr_preds = output_values = output_dict["gen_preds"]
-
-                    positions_to_match = ~gen_key_padding_mask
-
-                    loss = loss_expr = criterion(
-                        gen_expr_preds, gen_expr_target, positions_to_match
-                    )
+                    loss = loss + loss_zero_log_prob
 
                     if self.MVC:
-                        loss_mvc = criterion(
-                            output_dict["mvc_output"][:, pcpt_gene.shape[1]:], gen_expr_target, positions_to_match)
-                        loss = loss + loss_mvc
-                    
-                    if self.explicit_zero_prob:
-                        loss_zero_log_prob = criterion_neg_log_bernoulli(
-                            output_dict["mlm_zero_probs"], gen_expr_target, positions_to_match
+                        loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
+                            output_dict["mvc_zero_probs"], gen_expr_target, positions_to_match
                         )
-                        loss = loss + loss_zero_log_prob
+                        loss = loss + loss_gepc_zero_log_prob
 
-                        if self.MVC:
-                            loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
-                                output_dict["mvc_zero_probs"], gen_expr_target, positions_to_match
-                            )
-                            loss = loss + loss_gepc_zero_log_prob
+            else:
+                output_dict = self.model(
+                    input_gene_ids,
+                    input_values,
+                    src_key_padding_mask=src_key_padding_mask,
+                    MVC=self.MVC,
+                    generative_training=False,
+                    conditions=conditions_batch,
+                )
+                output_values = output_dict["mlm_output"]
 
-                else:
-                    output_dict = self.model(
-                        input_gene_ids,
-                        input_values,
-                        src_key_padding_mask=src_key_padding_mask,
-                        MVC=self.MVC,
-                        generative_training=False,
-                        conditions=conditions_batch,
+                positions_to_match = input_values.eq(
+                    self.mask_value
+                )  # the postions to predict
+                loss = loss_expr = criterion(
+                    output_values, target_values, positions_to_match
+                )
+
+                if self.MVC:
+                    loss_mvc = criterion(
+                        output_dict["mvc_output"], target_values, positions_to_match
                     )
-                    output_values = output_dict["mlm_output"]
+                    loss = loss + loss_mvc
+                
+                if self.explicit_zero_prob:
+                    loss_zero_log_prob = criterion_neg_log_bernoulli(
+                        output_dict["mlm_zero_probs"], target_values, positions_to_match
+                    )
+                    loss = loss + loss_zero_log_prob
 
-                    positions_to_match = input_values.eq(
-                        self.mask_value
-                    )  # the postions to predict
-                    loss = loss_expr = criterion(
+                    if self.MVC:
+                        loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
+                            output_dict["mvc_zero_probs"], target_values, positions_to_match
+                        )
+                        #print("loss gepc_ ", loss_gepc_zero_log_prob)
+                        loss = loss + loss_gepc_zero_log_prob
+            if self.do_dat:
+                if self.conditions:
+                    loss_conditions = torch.zeros(
+                        loss.shape).to(total_cond.device)
+                    for condition in self.conditions:
+                        loss_conditions += criterion_conditions(
+                            output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
+                    loss_conditions /= len(self.conditions)
+                    loss += loss_conditions
+            
+            if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
+                previous_cell_embs = output_dict["cell_emb"].detach().clone()
+                preds = self.model(
+                    pcpt_gene.clone(),
+                    pcpt_expr.clone(),
+                    pcpt_key_padding_mask.clone(),
+                    gen_gene.clone(),
+                    gen_key_padding_mask.clone(),
+                    MVC=False,
+                    input_cell_emb=previous_cell_embs,
+                    generative_training=True,
+                    conditions=conditions_batch
+                )["gen_preds"]
+
+                loss_gen = criterion(
+                    preds, gen_expr_target, positions_to_match)
+                loss = loss + loss_gen
+            
+        
+            self.accelerator.backward(loss)
+
+            if self.accelerator.sync_gradients:
+                self.accelerator.clip_grad_norm_(
+                    self.model.parameters(), 1.0)
+            self.optimizer.step()
+            self.scheduler.step()
+            self.optimizer.zero_grad()
+
+            with torch.no_grad():
+                if self.loss_type != "mse":
+                    mre = torch.zeros(1)
+                else:
+                    mre = masked_relative_error(
                         output_values, target_values, positions_to_match
                     )
 
-                    if self.MVC:
-                        loss_mvc = criterion(
-                            output_dict["mvc_output"], target_values, positions_to_match
-                        )
-                        loss = loss + loss_mvc
-                    
-                    if self.explicit_zero_prob:
-                        loss_zero_log_prob = criterion_neg_log_bernoulli(
-                            output_dict["mlm_zero_probs"], target_values, positions_to_match
-                        )
-                        loss = loss + loss_zero_log_prob
+            total_loss += loss
+            total_expr += loss_expr
 
-                        if self.MVC:
-                            loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
-                                output_dict["mvc_zero_probs"], target_values, positions_to_match
-                            )
-                            #print("loss gepc_ ", loss_gepc_zero_log_prob)
-                            loss = loss + loss_gepc_zero_log_prob
-                if self.do_dat:
-                    if self.conditions:
-                        loss_conditions = torch.zeros(
-                            loss.shape).to(total_cond.device)
-                        for condition in self.conditions:
-                            loss_conditions += criterion_conditions(
-                                output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
-                        loss_conditions /= len(self.conditions)
-                        loss += loss_conditions
-                
-                if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
-                    previous_cell_embs = output_dict["cell_emb"].detach().clone()
-                    preds = self.model(
-                        pcpt_gene.clone(),
-                        pcpt_expr.clone(),
-                        pcpt_key_padding_mask.clone(),
-                        gen_gene.clone(),
-                        gen_key_padding_mask.clone(),
-                        MVC=False,
-                        input_cell_emb=previous_cell_embs,
-                        generative_training=True,
-                        conditions=conditions_batch
-                    )["gen_preds"]
+            total_gen += (
+                loss_gen
+                if "loss_gen" in locals()
+                else torch.tensor(0.0, device=self.accelerator.device)
+            )
+            total_mvc += (
+                loss_mvc
+                if self.MVC
+                else torch.tensor(0.0, device=self.accelerator.device)
+            )
 
-                    loss_gen = criterion(
-                        preds, gen_expr_target, positions_to_match)
-                    loss = loss + loss_gen
-                
-          
-                self.accelerator.backward(loss)
+            if self.loss_type == "mse":
+                total_error += mre
+            total_cond += (
+                loss_conditions
+                if self.conditions and self.do_dat
+                else torch.tensor(0.0, device=self.accelerator.device)
+            )
 
-                if self.accelerator.sync_gradients:
-                    self.accelerator.clip_grad_norm_(
-                        self.model.parameters(), 1.0)
-                self.optimizer.step()
-                self.scheduler.step()
-                self.optimizer.zero_grad()
+            if batch % log_interval == 0 and batch > 0:
+                cur_loss = total_loss / log_interval
+                cur_expr = total_expr / log_interval
 
-                with torch.no_grad():
-                    if self.loss_type != "mse":
-                        mre = torch.zeros(1)
-                    else:
-                        mre = masked_relative_error(
-                            output_values, target_values, positions_to_match
-                        )
-
-                total_loss += loss
-                total_expr += loss_expr
-
-                total_gen += (
-                    loss_gen
+                cur_gen = (
+                    total_gen / log_interval
                     if "loss_gen" in locals()
                     else torch.tensor(0.0, device=self.accelerator.device)
                 )
-                total_mvc += (
-                    loss_mvc
+                cur_mvc = (
+                    total_mvc / log_interval
                     if self.MVC
                     else torch.tensor(0.0, device=self.accelerator.device)
                 )
-
-                if self.loss_type == "mse":
-                    total_error += mre
-                total_cond += (
-                    loss_conditions
-                    if self.conditions and self.do_dat
+                cur_error = total_error / log_interval
+                cur_cond = (
+                    total_cond / log_interval
+                    if self.conditions
                     else torch.tensor(0.0, device=self.accelerator.device)
                 )
 
-                if batch % log_interval == 0 and batch > 0:
-                    cur_loss = total_loss / log_interval
-                    cur_expr = total_expr / log_interval
-
-                    cur_gen = (
-                        total_gen / log_interval
-                        if "loss_gen" in locals()
-                        else torch.tensor(0.0, device=self.accelerator.device)
+                cur_loss, cur_expr, cur_gen, cur_mvc, cur_error, cur_cond = (
+                    self.accelerator.gather(
+                        (cur_loss, cur_expr,
+                            cur_gen, cur_mvc, cur_error, cur_cond)
                     )
-                    cur_mvc = (
-                        total_mvc / log_interval
-                        if self.MVC
-                        else torch.tensor(0.0, device=self.accelerator.device)
-                    )
-                    cur_error = total_error / log_interval
-                    cur_cond = (
-                        total_cond / log_interval
-                        if self.conditions
-                        else torch.tensor(0.0, device=self.accelerator.device)
-                    )
+                )
+                metrics = {
+                    "train/total_loss": cur_loss.mean(),
+                }
 
-                    cur_loss, cur_expr, cur_gen, cur_mvc, cur_error, cur_cond = (
-                        self.accelerator.gather(
-                            (cur_loss, cur_expr,
-                             cur_gen, cur_mvc, cur_error, cur_cond)
-                        )
-                    )
-                    metrics = {
-                        "train/total_loss": cur_loss.mean(),
-                    }
+                if self.USE_GENERATIVE_TRAINING:
+                    metrics["train/gen"] = cur_gen.mean()
+                if self.MVC:
+                    metrics["train/mvc"] = cur_mvc.mean()
+                if self.conditions:
+                    metrics["train/cond"] = cur_cond.mean()
+                if self.loss_type == "mse":
+                    metrics["train/mse"] = cur_expr.mean()
+                    metrics["train/mre"] = cur_error.mean()
+                else:
+                    metrics[f"train/{self.loss_type.value}"] = cur_expr.mean()
+                    
+                metrics["train/lr"] = self.scheduler.get_last_lr()[0]
 
-                    if self.USE_GENERATIVE_TRAINING:
-                        metrics["train/gen"] = cur_gen.mean()
-                    if self.MVC:
-                        metrics["train/mvc"] = cur_mvc.mean()
-                    if self.conditions:
-                        metrics["train/cond"] = cur_cond.mean()
-                    if self.loss_type == "mse":
-                        metrics["train/mse"] = cur_expr.mean()
-                        metrics["train/mre"] = cur_error.mean()
-                    else:
-                        metrics[f"train/{self.loss_type.value}"] = cur_expr.mean()
-                        
-                    metrics["train/lr"] = self.scheduler.get_last_lr()[0]
+                self.__log(metrics)
 
-                    self.__log(metrics)
-
-                    total_loss, total_expr, total_gen, total_mvc, total_error, total_cond = [
-                        torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
-                    ]
+                total_loss, total_expr, total_gen, total_mvc, total_error, total_cond = [
+                    torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
+                ]
 
     @ with_sdp_kernel
     def evaluate(self, epoch: int) -> Dict[str, float]:
