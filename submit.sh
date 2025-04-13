@@ -32,7 +32,6 @@ srun --environment=bionemo accelerate launch ./pretrain.py \
     --loss "mse" \
     --train-path "./debug_data" \
     --zero-percentages 0.2 0.4 0.6 \
-    --conditions "technology" \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
     --wandb "debug"
