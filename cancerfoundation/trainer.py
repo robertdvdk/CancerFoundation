@@ -355,7 +355,7 @@ class Trainer:
             self.model = self.load_model(pretrained_model_path)
 
         self.accelerate()
-
+        self.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         if self.resume_from_checkpoint != None:
             self.accelerator.print(
                 f"Resume from checkpoint: {self.resume_from_checkpoint}"
@@ -533,8 +533,8 @@ class Trainer:
                         preds, gen_expr_target, positions_to_match)
                     loss = loss + loss_gen
                 
-                with self.model.no_sync():
-                    self.accelerator.backward(loss)
+          
+                self.accelerator.backward(loss)
 
                 if self.accelerator.sync_gradients:
                     self.accelerator.clip_grad_norm_(

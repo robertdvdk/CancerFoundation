@@ -23,7 +23,6 @@ srun --environment=bionemo accelerate launch ./pretrain.py \
     --nheads 8 \
     --embsize $EMBSIZE \
     --d-hi 512 \
-    --grad-accu-steps 2 \
     --epochs 15 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
