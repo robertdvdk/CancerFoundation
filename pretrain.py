@@ -3,13 +3,15 @@ import sys
 from accelerate import Accelerator
 import os 
 
+from accelerate import DistributedDataParallelKwargs
+
 def main():
     sys.path.insert(0, "../")
     from utils import get_args
     from cancerfoundation.trainer import Trainer
     
     args = get_args()
-    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, log_with="wandb")
+    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, log_with="wandb", kwargs_handlers=[ddp_kwargs])
 
     trainer = Trainer(
         args=args,
@@ -47,6 +49,7 @@ def main():
     )
 
     epochs=args.epochs
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     trainer.setup_training(epochs=epochs, pretrained_model_path=None)#f"{args.resume_from_checkpoint}/accelerate/model.safetensors" if args.resume_from_checkpoint else None)
 
     if accelerator.is_main_process:
