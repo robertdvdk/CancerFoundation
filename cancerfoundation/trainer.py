@@ -533,7 +533,8 @@ class Trainer:
                         preds, gen_expr_target, positions_to_match)
                     loss = loss + loss_gen
                 
-                self.accelerator.backward(loss)
+                with self.model.no_sync():
+                    self.accelerator.backward(loss)
 
                 if self.accelerator.sync_gradients:
                     self.accelerator.clip_grad_norm_(
