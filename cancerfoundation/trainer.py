@@ -353,9 +353,9 @@ class Trainer:
 
         if pretrained_model_path:
             self.model = self.load_model(pretrained_model_path)
-
-        self.accelerate()
+            
         self.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        self.accelerate()
         if self.resume_from_checkpoint != None:
             self.accelerator.print(
                 f"Resume from checkpoint: {self.resume_from_checkpoint}"
