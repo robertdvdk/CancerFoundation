@@ -270,10 +270,8 @@ class Trainer:
             self.eval_loader,
         )
         
-        if isinstance(self.model, DistributedDataParallel):
-            self.model._set_static_graph()
             
-            
+    
     def __setup_training_variables(self, epochs: int) -> None:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
