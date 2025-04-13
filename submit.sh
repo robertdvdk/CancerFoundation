@@ -6,25 +6,35 @@
 #SBATCH -p debug
 
 # Run job step
+
+
+LOG_INTERVAL=16
+MAX_LENGTH=1200
+per_proc_batch_size=32
+LAYERS=6
+EMBSIZE=256
+JOB_NAME="cancerfoundation"
+
 srun --environment=bionemo accelerate launch ./pretrain.py \
-    --save-dir ./save/cancerfoundation-2025/04/13-21:59:21 \
-    --max-seq-len 2000 \
-    --batch-size 16 \
-    --do-dat \
-    --eval-batch-size 64 \
-    --nlayers 6 \
+    --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
+    --max-seq-len $MAX_LENGTH \
+    --batch-size $per_proc_batch_size \
+    --eval-batch-size $(($per_proc_batch_size)) \
+    --nlayers $LAYERS \
     --nheads 8 \
-    --embsize 128 \
-    --d-hi 128 \
-    --epochs 10 \
-    --lr 0.0001 
+    --embsize $EMBSIZE \
+    --d-hi 512 \
+    --grad-accu-steps 2 \
+    --epochs 15 \
+    --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
-    --log-interval 16 \
+    --log-interval $LOG_INTERVAL \
     --trunc-by-sample \
-    --loss mse \
-    --conditions technology \
-    --balance-primary tissue \
-    --balance-secondary technology\
-    --train-path training_data/pretraining_data/dataset_pretraining \
-    --wandb debug \
-    --zero-percentages 0.2 0.4 0.6
+    --loss "mse" \
+    --vocab $VOCAB_PATH \
+    --train-path "./debug_data" \
+    --zero-percentages 0.2 0.4 0.6 \
+    --conditions "technology" \
+    --balance-primary "tissue" \
+    --balance-secondary "technology" \
+    --wandb "debug"
