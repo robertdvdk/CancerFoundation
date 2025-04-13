@@ -1,10 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=edf-example
-#SBATCH --time=1:00:00
+#SBATCH --job-name=cf-pretrain
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH -p debug
-#SBATCH -A a-a05
 
 
 # Run job step
@@ -33,7 +30,6 @@ srun --environment=bionemo accelerate launch ./pretrain.py \
     --log-interval $LOG_INTERVAL \
     --trunc-by-sample \
     --loss "mse" \
-    --vocab $VOCAB_PATH \
     --train-path "./debug_data" \
     --zero-percentages 0.2 0.4 0.6 \
     --conditions "technology" \
