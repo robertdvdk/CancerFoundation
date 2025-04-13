@@ -11,6 +11,7 @@ def main():
     from cancerfoundation.trainer import Trainer
     
     args = get_args()
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, log_with="wandb", kwargs_handlers=[ddp_kwargs])
 
     trainer = Trainer(
