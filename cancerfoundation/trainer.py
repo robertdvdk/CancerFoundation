@@ -1,3 +1,4 @@
+from collections import defaultdict
 import time
 import os
 from typing import Dict, List, Optional, Union
@@ -417,18 +418,26 @@ class Trainer:
             self.optimizer.zero_grad()
             self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=step)
             self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=step)
-          
+            
+            if global_iter % (len(self.train_loader) // 2) == 0:
+                self.accelerator.wait_for_everyone()
+                self.evaluate(global_iter)
+
+                
 
     @with_sdp_kernel
     @torch.no_grad
-    def evaluate(self, epoch: int) -> Dict[str, float]:
+    def evaluate(self, global_iter: int) -> Dict[str, float]:
         self.model.eval()
-        criterion = self.gene_expr_loss
-
-        total_loss = torch.tensor(0.0, device=self.accelerator.device)
-        total_error = torch.tensor(0.0, device=self.accelerator.device)
 
         valid_loader = self.eval_loader
+        all_loss_dict = defaultdict(list)
         for batch, data_dict in tqdm(enumerate(valid_loader), total=len(valid_loader)):
             loss_dict  = self.model(data_dict, use_cell_embedding=self.use_cell_embedding)
+            for key, values in loss_dict.items():
+                all_loss_dict[key].append(values)
+        
+        all_loss_dict = {k : self.accelerator.gather_for_metrics(torch.stack(v)).mean().item() for k, v in all_loss_dict.items()}
+        self.accelerator.log({"eval/" + k:v for k,v in all_loss_dict.items()}, step=global_iter)
+    
             
