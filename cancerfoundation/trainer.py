@@ -156,8 +156,11 @@ class Trainer:
         
         self.train_loader = self._get_dataloader(self.train_dataset, self.train_sampler, train=True)
         self.eval_loader = self._get_dataloader(self.eval_dataset, self.eval_sampler, train=False)
+        
+        self.criterion = get_loss(
+            loss_type=loss_type, num_classes=self.n_input_bins if self.n_input_bins else None, scale_zero_expression=scale_zero_expression)
 
-        self.__set_model(mvc_decoder_style=mvc_decoder_style, gene_expr_out_dim=self.n_input_bins if self.n_input_bins else None, ntoken=len(self.vocab.keys()))
+        self.__set_model(mvc_decoder_style=mvc_decoder_style, gene_expr_out_dim=self.criterion.get_in_dim(), ntoken=len(self.vocab.keys()), criterion=self.criterion)
 
     def __initiate_wandb(self, run_id: str = None):
         assert (self.resume_from_checkpoint != None) == (run_id != None)
@@ -233,7 +236,7 @@ class Trainer:
             pin_memory=True,
         )
 
-    def __set_model(self, mvc_decoder_style: str, gene_expr_out_dim: int, ntoken: int):
+    def __set_model(self, mvc_decoder_style: str, gene_expr_out_dim: int, ntoken: int, criterion):
 
         self.model = TransformerModel(
             ntoken=ntoken,
@@ -244,9 +247,8 @@ class Trainer:
             d_hid=self.d_hid,
             nlayers=self.nlayers,
             dropout=self.dropout,
-            scale_zero_expression=self.scale_zero_expression,
-            loss_type=self.loss_type,
             pad_token_id=self.pad_token_id,
+            criterion=criterion,
             pad_value=self.pad_value,
             do_mvc=self.MVC,
             conditions=self.conditions_nums,
@@ -398,23 +400,13 @@ class Trainer:
             None
         """
 
+        for step, data_dict in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
+            self.model.train()
 
-
-        self.model.train()
-        # total_loss, total_expr, total_gen, total_mvc, total_error, total_cond = [
-        #     torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
-        # ]
-
-        active_dataloader = self.train_loader
-
-        for batch, data_dict in tqdm(enumerate(active_dataloader), total=len(active_dataloader)):
-            global_iter = batch + epoch * len(active_dataloader)
-
-            if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
-                self.use_cell_embedding = True
+            global_iter = step + epoch * len(self.train_loader)
+            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and global_iter > 1000
             
-            loss_dict = self.model(data_dict, generative_training=self.USE_GENERATIVE_TRAINING, MVC=self.MVC, use_cell_embedding=self.use_cell_embedding)
-
+            loss_dict = self.model(data_dict,use_cell_embedding=self.use_cell_embedding)
             self.accelerator.backward(loss_dict["total_loss"])
 
             if self.accelerator.sync_gradients:
@@ -423,89 +415,12 @@ class Trainer:
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
+            self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=step)
+            self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=step)
+          
 
-            with torch.no_grad():
-                if self.loss_type != "mse":
-                    mre = torch.zeros(1)
-                else:
-                    mre = masked_relative_error(
-                        output_values, target_values, positions_to_match
-                    )
-
-            total_loss += loss
-            total_expr += loss_expr
-
-            total_gen += (
-                loss_gen
-                if "loss_gen" in locals()
-                else torch.tensor(0.0, device=self.accelerator.device)
-            )
-            total_mvc += (
-                loss_mvc
-                if self.MVC
-                else torch.tensor(0.0, device=self.accelerator.device)
-            )
-
-            if self.loss_type == "mse":
-                total_error += mre
-            total_cond += (
-                loss_conditions
-                if self.conditions and self.do_dat
-                else torch.tensor(0.0, device=self.accelerator.device)
-            )
-
-            if batch % log_interval == 0 and batch > 0:
-                cur_loss = total_loss / log_interval
-                cur_expr = total_expr / log_interval
-
-                cur_gen = (
-                    total_gen / log_interval
-                    if "loss_gen" in locals()
-                    else torch.tensor(0.0, device=self.accelerator.device)
-                )
-                cur_mvc = (
-                    total_mvc / log_interval
-                    if self.MVC
-                    else torch.tensor(0.0, device=self.accelerator.device)
-                )
-                cur_error = total_error / log_interval
-                cur_cond = (
-                    total_cond / log_interval
-                    if self.conditions
-                    else torch.tensor(0.0, device=self.accelerator.device)
-                )
-
-                cur_loss, cur_expr, cur_gen, cur_mvc, cur_error, cur_cond = (
-                    self.accelerator.gather(
-                        (cur_loss, cur_expr,
-                            cur_gen, cur_mvc, cur_error, cur_cond)
-                    )
-                )
-                metrics = {
-                    "train/total_loss": cur_loss.mean(),
-                }
-
-                if self.USE_GENERATIVE_TRAINING:
-                    metrics["train/gen"] = cur_gen.mean()
-                if self.MVC:
-                    metrics["train/mvc"] = cur_mvc.mean()
-                if self.conditions:
-                    metrics["train/cond"] = cur_cond.mean()
-                if self.loss_type == "mse":
-                    metrics["train/mse"] = cur_expr.mean()
-                    metrics["train/mre"] = cur_error.mean()
-                else:
-                    metrics[f"train/{self.loss_type.value}"] = cur_expr.mean()
-                    
-                metrics["train/lr"] = self.scheduler.get_last_lr()[0]
-
-                self.__log(metrics)
-
-                total_loss, total_expr, total_gen, total_mvc, total_error, total_cond = [
-                    torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
-                ]
-
-    @ with_sdp_kernel
+    @with_sdp_kernel
+    @torch.no_grad
     def evaluate(self, epoch: int) -> Dict[str, float]:
         self.model.eval()
         criterion = self.gene_expr_loss
@@ -514,83 +429,6 @@ class Trainer:
         total_error = torch.tensor(0.0, device=self.accelerator.device)
 
         valid_loader = self.eval_loader
-        with torch.no_grad():
-            for batch, data_dict in tqdm(enumerate(valid_loader), total=len(valid_loader)):
-                conditions_batch = data_dict["conditions"] if self.conditions else None
-
-                if self.USE_GENERATIVE_TRAINING:
-                    pcpt_gene = data_dict["pcpt_gene"]
-                    pcpt_expr = data_dict["pcpt_expr"]
-                    pcpt_key_padding_mask = pcpt_gene.eq(
-                        self.pad_token_id)
-                    gen_gene = data_dict["gen_gene"]
-                    gen_expr_target = target_values = data_dict["gen_expr_target"]
-                    gen_key_padding_mask = gen_gene.eq(
-                        self.pad_token_id)
-                else:
-                    input_gene_ids = data_dict["gene"]
-                    input_values = data_dict["masked_expr"]
-                    target_values = data_dict["expr"]
-                    src_key_padding_mask = input_gene_ids.eq(
-                        self.pad_token_id)
-
-                if self.USE_GENERATIVE_TRAINING:
-                    output_dict = self.model(
-                        pcpt_gene,
-                        pcpt_expr,
-                        pcpt_key_padding_mask,
-                        gen_gene,
-                        gen_key_padding_mask,
-                        MVC=False,
-                        generative_training=True,
-                        conditions=conditions_batch,
-                    )
-                    gen_expr_preds = output_values = output_dict["gen_preds"]
-
-                    positions_to_match = ~gen_key_padding_mask
-                else:
-                    output_dict = self.model(
-                        input_gene_ids,
-                        input_values,
-                        src_key_padding_mask=src_key_padding_mask,
-                        CCE=False,
-                        MVC=False,
-                        generative_training=False,
-                        conditions=conditions_batch,
-                    )
-                    output_values = output_dict["mlm_output"]
-                    positions_to_match = input_values.eq(self.mask_value)
-
-                loss = criterion(output_values, target_values,
-                                 positions_to_match)
-
-                total_loss += loss
-
-                if self.loss_type == "mse":
-                    total_error += masked_relative_error(
-                        output_values, target_values, positions_to_match
-                    )
-
-            total_loss = total_loss / len(valid_loader)
-            total_error = total_error / len(valid_loader)
-
-            total_loss, total_error = (
-                self.accelerator.gather(
-                    (total_loss, total_error)
-                ))  # TODO: This is not ideal. Should use gather_for_metrics instead
-            total_loss, total_error = total_loss.mean(), total_error.mean()
-
-            best = total_loss < self.best_val_loss["loss"]
-            if best:
-                self.best_val_loss = {
-                    "loss": total_loss.item(), "epoch": epoch}
-
-            if self.loss_type == "mse":
-                metrics = {
-                    "eval/mse": total_loss,
-                    "eval/mre": total_error,
-                }
-            else:
-                metrics = {f"eval/{self.loss_type.value}": total_loss}
-
-            self.__log(metrics)
+        for batch, data_dict in tqdm(enumerate(valid_loader), total=len(valid_loader)):
+            loss_dict  = self.model(data_dict, use_cell_embedding=self.use_cell_embedding)
+            

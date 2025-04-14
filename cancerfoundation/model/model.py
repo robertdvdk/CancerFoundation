@@ -9,7 +9,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.distributions import Bernoulli
 from tqdm import trange
 
-from cancerfoundation.loss import LossType, criterion_neg_log_bernoulli, get_loss
+from cancerfoundation.loss import LossType, criterion_neg_log_bernoulli, get_loss, masked_relative_error
 from .grad_reverse import grad_reverse
 
 from .layers import CFLayer, CFGenerator
@@ -26,8 +26,7 @@ class TransformerModel(nn.Module):
         nlayers: int,
         pad_value: int,
         pad_token_id: int,
-        loss_type: LossType = LossType.MSE,
-        scale_zero_expression: Optional[float] = None,
+        criterion,
         dropout: float = 0.5,
         do_mvc: bool = False,
         conditions: Dict = None,
@@ -80,8 +79,7 @@ class TransformerModel(nn.Module):
 
         self.do_dat = do_dat
         self.criterion_conditions = nn.CrossEntropyLoss()
-        self.criterion = get_loss(
-            loss_type=loss_type, num_classes=self.n_input_bins if self.n_input_bins else None, scale_zero_expression=scale_zero_expression)
+        self.criterion = criterion
         
         if conditions:
             self.condition_encoders = nn.ModuleDict({})
@@ -138,6 +136,8 @@ class TransformerModel(nn.Module):
                 conditions=self.conditions,
                 out_dim=out_dim
             )
+        self.MVC = do_mvc
+        
 
         self.init_weights()
 
@@ -424,8 +424,6 @@ class TransformerModel(nn.Module):
     def forward(
         self,
         tensors: dict[str, torch.Tensor],
-        generative_training: bool = False,
-        MVC: bool = False,
         use_cell_embedding: bool = False
     ) -> Mapping[str, Tensor]:
         """
@@ -433,9 +431,9 @@ class TransformerModel(nn.Module):
         on the value of the "generative_training" kwarg.
         """
         
-        
+        loss_dict = {}
         conditions_batch = tensors["conditions"] if self.conditions else None
-        if generative_training:
+        if self.use_generative_training:
             
             pcpt_gene, pcpt_expr, pcpt_key_padding_mask, gen_gene, gen_expr_target, gen_key_padding_mask = self._prepare_generative_input(tensors)
             output_dict = self.generative_forward(pcpt_gene,
@@ -443,7 +441,7 @@ class TransformerModel(nn.Module):
                     pcpt_key_padding_mask,
                     gen_gene,
                     gen_key_padding_mask,
-                    MVC=MVC,
+                    MVC=self.MVC,
                     conditions=conditions_batch
                     )
             
@@ -454,24 +452,27 @@ class TransformerModel(nn.Module):
             loss = loss_expr = self.criterion(
                 gen_expr_preds, gen_expr_target, positions_to_match
             )
-
-            if MVC:
+            loss_dict["loss_expr"] = loss_expr       
+            
+            if self.MVC:
                 loss_mvc = self.criterion(
                     output_dict["mvc_output"][:, pcpt_gene.shape[1]:], gen_expr_target, positions_to_match)
                 loss = loss + loss_mvc
-            
+                loss_dict["loss_mvc"] = loss_mvc       
+
             if self.explicit_zero_prob:
                 loss_zero_log_prob = criterion_neg_log_bernoulli(
                     output_dict["mlm_zero_probs"], gen_expr_target, positions_to_match
                 )
                 loss = loss + loss_zero_log_prob
-
-                if MVC:
+                loss_dict["loss_zero_log_prob"] = loss_zero_log_prob
+                if self.MVC:
                     loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
                         output_dict["mvc_zero_probs"], gen_expr_target, positions_to_match
                     )
                     loss = loss + loss_gepc_zero_log_prob
-            
+                    loss_dict["loss_gepc_zero_log_prob"] = loss_gepc_zero_log_prob
+
         else:
             input_gene_ids, input_values, src_key_padding_mask, target_values = self._prepare_perceptual_input(tensors)
             output_dict = self.perceptual_forward(input_gene_ids, input_values, src_key_padding_mask=src_key_padding_mask, conditions=conditions_batch, MVC=MVC)
@@ -485,7 +486,7 @@ class TransformerModel(nn.Module):
                 output_values, target_values, positions_to_match
             )
 
-            if MVC:
+            if self.MVC:
                 loss_mvc = self.criterion(
                     output_dict["mvc_output"], target_values, positions_to_match
                 )
@@ -497,43 +498,45 @@ class TransformerModel(nn.Module):
                 )
                 loss = loss + loss_zero_log_prob
 
-                if MVC:
+                if self.MVC:
                     loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
                         output_dict["mvc_zero_probs"], target_values, positions_to_match
                     )
-                    #print("loss gepc_ ", loss_gepc_zero_log_prob)
                     loss = loss + loss_gepc_zero_log_prob
                     
         
-            if self.do_dat:
-                if self.conditions:
-                    loss_conditions = torch.zeros(
-                        loss.shape).to(total_cond.device)
-                    for condition in self.conditions:
-                        loss_conditions += self.criterion_conditions(
-                            output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
-                    loss_conditions /= len(self.conditions)
-                    loss += loss_conditions
+        if self.do_dat:
+            if self.conditions:
+                loss_conditions = torch.zeros(
+                    loss.shape).to(total_cond.device)
+                for condition in self.conditions:
+                    loss_conditions += self.criterion_conditions(
+                        output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
+                loss_conditions /= len(self.conditions)
+                loss += loss_conditions
             
-            if use_cell_embedding:
-                previous_cell_embs = output_dict["cell_emb"].detach().clone()
-                preds = self.generative_forward(
-                    pcpt_gene.clone(),
-                    pcpt_expr.clone(),
-                    pcpt_key_padding_mask.clone(),
-                    gen_gene.clone(),
-                    gen_key_padding_mask.clone(),
-                    MVC=False,
-                    input_cell_emb=previous_cell_embs,
-                    generative_training=True,
-                    conditions=conditions_batch
-                )["gen_preds"]
+        if use_cell_embedding:
+            previous_cell_embs = output_dict["cell_emb"].detach().clone()
+            preds = self.generative_forward(
+                pcpt_gene.clone(),
+                pcpt_expr.clone(),
+                pcpt_key_padding_mask.clone(),
+                gen_gene.clone(),
+                gen_key_padding_mask.clone(),
+                MVC=False,
+                input_cell_emb=previous_cell_embs,
+                conditions=conditions_batch
+            )["gen_preds"]
 
-                loss_gen = self.criterion(
-                    preds, gen_expr_target, positions_to_match)
-                loss = loss + loss_gen
-                
-            return {"total_loss": loss}
+            loss_gen = self.criterion(
+                preds, gen_expr_target, positions_to_match)
+            loss = loss + loss_gen
+            loss_dict["loss_gen"] = loss_gen
+        
+        #with torch.no_grad():  
+        #    loss_dict["loss_mre"] = masked_relative_error(output_values, target_values, positions_to_match)       
+        loss_dict["total_loss"] = loss       
+        return loss_dict
             
             
 
