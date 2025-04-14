@@ -8,6 +8,8 @@ import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.distributions import Bernoulli
 from tqdm import trange
+
+from cancerfoundation.loss import LossType, criterion_neg_log_bernoulli, get_loss
 from .grad_reverse import grad_reverse
 
 from .layers import CFLayer, CFGenerator
@@ -24,6 +26,8 @@ class TransformerModel(nn.Module):
         nlayers: int,
         pad_value: int,
         pad_token_id: int,
+        loss_type: LossType = LossType.MSE,
+        scale_zero_expression: Optional[float] = None,
         dropout: float = 0.5,
         do_mvc: bool = False,
         conditions: Dict = None,
@@ -44,7 +48,9 @@ class TransformerModel(nn.Module):
         self.input_emb_style = input_emb_style
         self.cell_emb_style = cell_emb_style
         self.explicit_zero_prob = explicit_zero_prob
+        self.pad_token_id = pad_token_id
         self.norm_scheme = "pre" if pre_norm else "post"
+
         self.n_input_bins = n_input_bins
         if self.input_emb_style not in ["category", "continuous", "scaling"]:
             raise ValueError(
@@ -73,7 +79,10 @@ class TransformerModel(nn.Module):
             # TODO: Correct handle the mask_value when using scaling
 
         self.do_dat = do_dat
-
+        self.criterion_conditions = nn.CrossEntropyLoss()
+        self.criterion = get_loss(
+            loss_type=loss_type, num_classes=self.n_input_bins if self.n_input_bins else None, scale_zero_expression=scale_zero_expression)
+        
         if conditions:
             self.condition_encoders = nn.ModuleDict({})
             for cond_name, cond_num in self.conditions.items():
@@ -388,30 +397,145 @@ class TransformerModel(nn.Module):
                     output["condition_output"][cond_name] = discriminator(cell_emb)
 
         return output
+    
+    def _prepare_generative_input(self, tensors: dict[str, torch.Tensor]):
+        pcpt_gene = tensors["pcpt_gene"]
+        pcpt_expr = tensors["pcpt_expr"]
+        pcpt_key_padding_mask = pcpt_gene.eq(
+            self.pad_token_id)
+        gen_gene = tensors["gen_gene"]
+        gen_expr_target = target_values = tensors["gen_expr_target"]
+        gen_key_padding_mask = gen_gene.eq(
+            self.pad_token_id)
+        
+        return pcpt_gene, pcpt_expr, pcpt_key_padding_mask, gen_gene, gen_expr_target, gen_key_padding_mask
+        
+    def _prepare_perceptual_input(self, tensors: dict[str, torch.Tensor]):
+        input_gene_ids = tensors["gene"]
+        input_values = tensors["masked_expr"]
+        target_values = tensors["expr"]
+        src_key_padding_mask = input_gene_ids.eq(
+            self.pad_token_id)
+         
+        return input_gene_ids, input_values, src_key_padding_mask, target_values
+        
+        
 
     def forward(
         self,
-        *args,
-        **kwargs,
+        tensors: dict[str, torch.Tensor],
+        generative_training: bool = False,
+        MVC: bool = False,
+        use_cell_embedding: bool = False
     ) -> Mapping[str, Tensor]:
         """
         Wrapper to call either generative_forward or perceptual_forward, depending
         on the value of the "generative_training" kwarg.
         """
-        if "generative_training" not in kwargs:
-            # raise ValueError("generative_training kwarg is required")
-            warnings.warn(
-                "generative_training kwarg is required but not provided! "
-                "Using False and calling perceptual_forward instead"
-            )
-            return self.perceptual_forward(*args, **kwargs)
+        
+        
+        conditions_batch = tensors["conditions"] if self.conditions else None
+        if generative_training:
+            
+            pcpt_gene, pcpt_expr, pcpt_key_padding_mask, gen_gene, gen_expr_target, gen_key_padding_mask = self._prepare_generative_input(tensors)
+            output_dict = self.generative_forward(pcpt_gene,
+                    pcpt_expr,
+                    pcpt_key_padding_mask,
+                    gen_gene,
+                    gen_key_padding_mask,
+                    MVC=MVC,
+                    conditions=conditions_batch
+                    )
+            
+            gen_expr_preds = output_values = output_dict["gen_preds"]
 
-        # get the generative training flag and pop it out
-        do_generative_training = kwargs.pop("generative_training")
-        if do_generative_training:
-            return self.generative_forward(*args, **kwargs)
+            positions_to_match = ~gen_key_padding_mask
+
+            loss = loss_expr = self.criterion(
+                gen_expr_preds, gen_expr_target, positions_to_match
+            )
+
+            if MVC:
+                loss_mvc = self.criterion(
+                    output_dict["mvc_output"][:, pcpt_gene.shape[1]:], gen_expr_target, positions_to_match)
+                loss = loss + loss_mvc
+            
+            if self.explicit_zero_prob:
+                loss_zero_log_prob = criterion_neg_log_bernoulli(
+                    output_dict["mlm_zero_probs"], gen_expr_target, positions_to_match
+                )
+                loss = loss + loss_zero_log_prob
+
+                if MVC:
+                    loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
+                        output_dict["mvc_zero_probs"], gen_expr_target, positions_to_match
+                    )
+                    loss = loss + loss_gepc_zero_log_prob
+            
         else:
-            return self.perceptual_forward(*args, **kwargs)
+            input_gene_ids, input_values, src_key_padding_mask, target_values = self._prepare_perceptual_input(tensors)
+            output_dict = self.perceptual_forward(input_gene_ids, input_values, src_key_padding_mask=src_key_padding_mask, conditions=conditions_batch, MVC=MVC)
+            
+            output_values = output_dict["mlm_output"]
+
+            positions_to_match = input_values.eq(
+                self.mask_value
+            )  # the postions to predict
+            loss = loss_expr = self.criterion(
+                output_values, target_values, positions_to_match
+            )
+
+            if MVC:
+                loss_mvc = self.criterion(
+                    output_dict["mvc_output"], target_values, positions_to_match
+                )
+                loss = loss + loss_mvc
+            
+            if self.explicit_zero_prob:
+                loss_zero_log_prob = criterion_neg_log_bernoulli(
+                    output_dict["mlm_zero_probs"], target_values, positions_to_match
+                )
+                loss = loss + loss_zero_log_prob
+
+                if MVC:
+                    loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
+                        output_dict["mvc_zero_probs"], target_values, positions_to_match
+                    )
+                    #print("loss gepc_ ", loss_gepc_zero_log_prob)
+                    loss = loss + loss_gepc_zero_log_prob
+                    
+        
+            if self.do_dat:
+                if self.conditions:
+                    loss_conditions = torch.zeros(
+                        loss.shape).to(total_cond.device)
+                    for condition in self.conditions:
+                        loss_conditions += self.criterion_conditions(
+                            output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
+                    loss_conditions /= len(self.conditions)
+                    loss += loss_conditions
+            
+            if use_cell_embedding:
+                previous_cell_embs = output_dict["cell_emb"].detach().clone()
+                preds = self.generative_forward(
+                    pcpt_gene.clone(),
+                    pcpt_expr.clone(),
+                    pcpt_key_padding_mask.clone(),
+                    gen_gene.clone(),
+                    gen_key_padding_mask.clone(),
+                    MVC=False,
+                    input_cell_emb=previous_cell_embs,
+                    generative_training=True,
+                    conditions=conditions_batch
+                )["gen_preds"]
+
+                loss_gen = self.criterion(
+                    preds, gen_expr_target, positions_to_match)
+                loss = loss + loss_gen
+                
+            return {"total_loss": loss}
+            
+            
 
     def generative_forward(
         self,
@@ -421,7 +545,6 @@ class TransformerModel(nn.Module):
         gen_genes: Tensor,
         gen_key_padding_mask: Tensor,
         conditions: Optional[Dict] = None,
-        CCE: bool = False,
         MVC: bool = False,
         do_sample: bool = False,
         input_cell_emb: Optional[Tensor] = None,
@@ -513,7 +636,6 @@ class TransformerModel(nn.Module):
         values: Tensor,
         src_key_padding_mask: Tensor,
         conditions: Optional[Dict] = None,
-        CCE: bool = False,
         MVC: bool = False,
         do_sample: bool = False,
     ) -> Mapping[str, Tensor]:

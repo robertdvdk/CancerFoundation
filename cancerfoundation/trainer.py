@@ -100,6 +100,7 @@ class Trainer:
         self.USE_GENERATIVE_TRAINING = (
             True if self.training_tasks in ["gen", "both"] else False
         )
+        self.use_cell_embedding = False
         self.domain_nums = None
 
      
@@ -135,8 +136,7 @@ class Trainer:
         self.balance_secondary = balance_secondary
         self.zero_percentages = zero_percentages
 
-        self.gene_expr_loss = get_loss(
-            loss_type=loss_type, num_classes=self.n_input_bins if self.n_input_bins else None, scale_zero_expression=scale_zero_expression)
+        self.scale_zero_expression = scale_zero_expression
         
         self.dataset = self.__create_datasets(data_path=data_path)
         
@@ -157,7 +157,7 @@ class Trainer:
         self.train_loader = self._get_dataloader(self.train_dataset, self.train_sampler, train=True)
         self.eval_loader = self._get_dataloader(self.eval_dataset, self.eval_sampler, train=False)
 
-        self.__set_model(mvc_decoder_style=mvc_decoder_style, gene_expr_out_dim=self.gene_expr_loss.get_in_dim(), ntoken=len(self.vocab.keys()))
+        self.__set_model(mvc_decoder_style=mvc_decoder_style, gene_expr_out_dim=self.n_input_bins if self.n_input_bins else None, ntoken=len(self.vocab.keys()))
 
     def __initiate_wandb(self, run_id: str = None):
         assert (self.resume_from_checkpoint != None) == (run_id != None)
@@ -244,6 +244,8 @@ class Trainer:
             d_hid=self.d_hid,
             nlayers=self.nlayers,
             dropout=self.dropout,
+            scale_zero_expression=self.scale_zero_expression,
+            loss_type=self.loss_type,
             pad_token_id=self.pad_token_id,
             pad_value=self.pad_value,
             do_mvc=self.MVC,
@@ -396,147 +398,28 @@ class Trainer:
             None
         """
 
-        criterion = self.gene_expr_loss
 
-        if self.conditions:
-            criterion_conditions = nn.CrossEntropyLoss()
 
         self.model.train()
-        total_loss, total_expr, total_gen, total_mvc, total_error, total_cond = [
-            torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
-        ]
+        # total_loss, total_expr, total_gen, total_mvc, total_error, total_cond = [
+        #     torch.tensor(0.0, device=self.accelerator.device) for _ in range(6)
+        # ]
 
         active_dataloader = self.train_loader
 
         for batch, data_dict in tqdm(enumerate(active_dataloader), total=len(active_dataloader)):
             global_iter = batch + epoch * len(active_dataloader)
-            if self.timer == None:
-                self.timer = time.time()
 
-            conditions_batch = data_dict["conditions"] if self.conditions else None
-
-            if self.USE_GENERATIVE_TRAINING:
-                pcpt_gene = data_dict["pcpt_gene"]
-                pcpt_expr = data_dict["pcpt_expr"]
-                pcpt_key_padding_mask = pcpt_gene.eq(
-                    self.pad_token_id)
-                gen_gene = data_dict["gen_gene"]
-                gen_expr_target = target_values = data_dict["gen_expr_target"]
-                gen_key_padding_mask = gen_gene.eq(
-                    self.pad_token_id)
-            else:
-                input_gene_ids = data_dict["gene"]
-                input_values = data_dict["masked_expr"]
-                target_values = data_dict["expr"]
-                src_key_padding_mask = input_gene_ids.eq(
-                    self.pad_token_id)
-
-            if self.USE_GENERATIVE_TRAINING:
-                output_dict = self.model(
-                    pcpt_gene,
-                    pcpt_expr,
-                    pcpt_key_padding_mask,
-                    gen_gene,
-                    gen_key_padding_mask,
-                    MVC=self.MVC,
-                    generative_training=True,
-                    conditions=conditions_batch,
-                )
-                gen_expr_preds = output_values = output_dict["gen_preds"]
-
-                positions_to_match = ~gen_key_padding_mask
-
-                loss = loss_expr = criterion(
-                    gen_expr_preds, gen_expr_target, positions_to_match
-                )
-
-                if self.MVC:
-                    loss_mvc = criterion(
-                        output_dict["mvc_output"][:, pcpt_gene.shape[1]:], gen_expr_target, positions_to_match)
-                    loss = loss + loss_mvc
-                
-                if self.explicit_zero_prob:
-                    loss_zero_log_prob = criterion_neg_log_bernoulli(
-                        output_dict["mlm_zero_probs"], gen_expr_target, positions_to_match
-                    )
-                    loss = loss + loss_zero_log_prob
-
-                    if self.MVC:
-                        loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
-                            output_dict["mvc_zero_probs"], gen_expr_target, positions_to_match
-                        )
-                        loss = loss + loss_gepc_zero_log_prob
-
-            else:
-                output_dict = self.model(
-                    input_gene_ids,
-                    input_values,
-                    src_key_padding_mask=src_key_padding_mask,
-                    MVC=self.MVC,
-                    generative_training=False,
-                    conditions=conditions_batch,
-                )
-                output_values = output_dict["mlm_output"]
-
-                positions_to_match = input_values.eq(
-                    self.mask_value
-                )  # the postions to predict
-                loss = loss_expr = criterion(
-                    output_values, target_values, positions_to_match
-                )
-
-                if self.MVC:
-                    loss_mvc = criterion(
-                        output_dict["mvc_output"], target_values, positions_to_match
-                    )
-                    loss = loss + loss_mvc
-                
-                if self.explicit_zero_prob:
-                    loss_zero_log_prob = criterion_neg_log_bernoulli(
-                        output_dict["mlm_zero_probs"], target_values, positions_to_match
-                    )
-                    loss = loss + loss_zero_log_prob
-
-                    if self.MVC:
-                        loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
-                            output_dict["mvc_zero_probs"], target_values, positions_to_match
-                        )
-                        #print("loss gepc_ ", loss_gepc_zero_log_prob)
-                        loss = loss + loss_gepc_zero_log_prob
-            if self.do_dat:
-                if self.conditions:
-                    loss_conditions = torch.zeros(
-                        loss.shape).to(total_cond.device)
-                    for condition in self.conditions:
-                        loss_conditions += criterion_conditions(
-                            output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
-                    loss_conditions /= len(self.conditions)
-                    loss += loss_conditions
-            
             if self.USE_GENERATIVE_TRAINING and global_iter > 1000:
-                previous_cell_embs = output_dict["cell_emb"].detach().clone()
-                preds = self.model(
-                    pcpt_gene.clone(),
-                    pcpt_expr.clone(),
-                    pcpt_key_padding_mask.clone(),
-                    gen_gene.clone(),
-                    gen_key_padding_mask.clone(),
-                    MVC=False,
-                    input_cell_emb=previous_cell_embs,
-                    generative_training=True,
-                    conditions=conditions_batch
-                )["gen_preds"]
-
-                loss_gen = criterion(
-                    preds, gen_expr_target, positions_to_match)
-                loss = loss + loss_gen
+                self.use_cell_embedding = True
             
-            loss.backward()      
-            # self.accelerator.backward(loss)
+            loss_dict = self.model(data_dict, generative_training=self.USE_GENERATIVE_TRAINING, MVC=self.MVC, use_cell_embedding=self.use_cell_embedding)
 
-            # if self.accelerator.sync_gradients:
-            #     self.accelerator.clip_grad_norm_(
-            #         self.model.parameters(), 1.0)
+            self.accelerator.backward(loss_dict["total_loss"])
+
+            if self.accelerator.sync_gradients:
+                self.accelerator.clip_grad_norm_(
+                    self.model.parameters(), 1.0)
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()

@@ -6,7 +6,9 @@
 #SBATCH --time=01:00:00
 #SBATCH --mem-per-cpu=8G
 #SBATCH -p gpu
-#SBATCH --gres=gpu:1
+#SBATCH -A a0-05
+
+
 
 # Set visible GPUs to what SLURM assigned (if available)
 export CUDA_VISIBLE_DEVICES=$(echo $SLURM_JOB_GPUS | tr ',' '\n' | paste -sd "," -)
