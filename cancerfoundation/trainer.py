@@ -64,7 +64,7 @@ class Trainer:
         mvc_decoder_style: str = "inner product",
         scale_zero_expression: Optional[float] = None,
         accelerator = None,
-        do_dat: Optional[bool] = False,
+        do_dat: bool = False,
         explicit_zero_prob: Optional[bool] = False,
         balance_primary: Optional[str] = None,
         balance_secondary: Optional[str] = None,
@@ -419,10 +419,6 @@ class Trainer:
             self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=step)
             self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=step)
             
-            if global_iter % (len(self.train_loader) // 2) == 0:
-                self.accelerator.wait_for_everyone()
-                self.evaluate(global_iter)
-
                 
 
     @with_sdp_kernel

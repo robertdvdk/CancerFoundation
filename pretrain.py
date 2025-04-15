@@ -65,6 +65,7 @@ def main():
         trainer.train(epoch, log_interval=args.log_interval)
         
         accelerator.print("Evaluating...")
+        trainer.evaluate(epoch)
         trainer.checkpoint(epoch)
     
     accelerator.end_training()
