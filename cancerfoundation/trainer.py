@@ -19,15 +19,12 @@ from safetensors import safe_open
 from .loss import LossType
 
 from torch.utils.data import random_split
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from accelerate.utils.tqdm import tqdm
 
 def with_sdp_kernel(func):
     def wrapped_func(*args, **kwargs):
-        with torch.backends.cuda.sdp_kernel(
-            enable_flash=True,
-            enable_math=True,
-            enable_mem_efficient=True
-        ):
+        with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
             return func(*args, **kwargs)
     return wrapped_func
 
