@@ -104,8 +104,6 @@ class Trainer:
         self.use_cell_embedding = False
         self.domain_nums = None
 
-     
-
         self.explicit_zero_prob = explicit_zero_prob
 
         self.do_dat = do_dat
@@ -423,7 +421,7 @@ class Trainer:
 
     @with_sdp_kernel
     @torch.no_grad
-    def evaluate(self, global_iter: int) -> Dict[str, float]:
+    def evaluate(self, epoch: int) -> Dict[str, float]:
         self.model.eval()
 
         valid_loader = self.eval_loader
@@ -434,6 +432,6 @@ class Trainer:
                 all_loss_dict[key].append(values)
         
         all_loss_dict = {k : self.accelerator.gather_for_metrics(torch.stack(v)).mean().item() for k, v in all_loss_dict.items()}
-        self.accelerator.log({"eval/" + k:v for k,v in all_loss_dict.items()}, step=global_iter)
+        self.accelerator.log({"eval/" + k:v for k,v in all_loss_dict.items()}, step=epoch)
     
             
