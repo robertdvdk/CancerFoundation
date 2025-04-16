@@ -42,4 +42,6 @@ srun --environment=bionemo accelerate launch  --num_processes $((SLURM_NNODES * 
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
+    --conditions "technology" \
+    --do-dat
     --wandb "debug"
