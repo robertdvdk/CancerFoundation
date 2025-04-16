@@ -414,8 +414,8 @@ class Trainer:
             self.optimizer.step()
             self.scheduler.step()
             self.optimizer.zero_grad()
-            self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=step)
-            self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=step)
+            self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=global_iter)
+            self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=global_iter)
             
                 
 
