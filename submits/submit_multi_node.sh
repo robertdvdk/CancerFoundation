@@ -32,7 +32,7 @@ srun --environment=bionemo accelerate launch  --num_processes $((SLURM_NNODES * 
     --nheads 8 \
     --embsize $EMBSIZE \
     --d-hi 512 \
-    --epochs 15 \
+    --epochs 30 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --log-interval $LOG_INTERVAL \
