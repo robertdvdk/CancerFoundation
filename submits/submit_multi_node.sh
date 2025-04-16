@@ -15,7 +15,7 @@ LAYERS=6
 EMBSIZE=256
 JOB_NAME="cancerfoundation"
 
-ACCEL_PROCS=$(( $SLURM_NNODES * $SLURM_GPUS_PER_NODE ))
+ACCEL_PROCS=$(( $SLURM_NNODES * 4 ))
 
 MAIN_ADDR=$(echo "${SLURM_NODELIST}" | sed 's/[],].*//g; s/\[//g')
 MAIN_PORT=128485
