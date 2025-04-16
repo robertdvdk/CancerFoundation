@@ -507,13 +507,17 @@ class TransformerModel(nn.Module):
         
         if self.do_dat:
             if self.conditions:
-                loss_conditions = torch.zeros(
-                    loss.shape).to(total_cond.device)
                 for condition in self.conditions:
-                    loss_conditions += self.criterion_conditions(
+                    
+                    
+                    condition_loss = self.criterion_conditions(
                         output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
-                loss_conditions /= len(self.conditions)
-                loss += loss_conditions
+                    
+                    loss += condition_loss / len(self.conditions)
+                    
+                    loss_dict["condition_" + condition] = condition_loss.detach() / len(self.conditions)
+                    
+                
             
         if use_cell_embedding:
             previous_cell_embs = output_dict["cell_emb"].detach().clone()
