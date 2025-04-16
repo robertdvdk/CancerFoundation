@@ -18,7 +18,7 @@ JOB_NAME="cancerfoundation"
 ACCEL_PROCS=$(( $SLURM_NNODES * 4 ))
 
 MAIN_ADDR=$(echo "${SLURM_NODELIST}" | sed 's/[],].*//g; s/\[//g')
-MAIN_PORT=128485
+MAIN_PORT=12848
 
 srun --environment=bionemo accelerate launch \
     --num_machines=$SLURM_NNODES --num_processes=$ACCEL_PROCS \

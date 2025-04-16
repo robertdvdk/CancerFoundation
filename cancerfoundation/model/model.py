@@ -536,9 +536,7 @@ class TransformerModel(nn.Module):
                 preds, gen_expr_target, positions_to_match)
             loss = loss + loss_gen
             loss_dict["loss_gen"] = loss_gen
-        
-        #with torch.no_grad():  
-        #    loss_dict["loss_mre"] = masked_relative_error(output_values, target_values, positions_to_match)       
+          
         loss_dict["total_loss"] = loss       
         return loss_dict
             
