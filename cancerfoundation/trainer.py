@@ -155,6 +155,7 @@ class Trainer:
         
         self.train_loader = self._get_dataloader(self.train_dataset, self.train_sampler, train=True)
         self.eval_loader = self._get_dataloader(self.eval_dataset, self.eval_sampler, train=False)
+        self.global_iter = 0
         
         self.criterion = get_loss(
             loss_type=loss_type, num_classes=self.n_input_bins if self.n_input_bins else None, scale_zero_expression=scale_zero_expression)
@@ -399,11 +400,10 @@ class Trainer:
             None
         """
 
-        for step, data_dict in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
+        for data_dict in tqdm(self.train_loader, total=len(self.train_loader)):
             self.model.train()
 
-            global_iter = step + epoch * len(self.train_loader)
-            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and global_iter > 1000
+            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > 1000
             
             loss_dict = self.model(data_dict,use_cell_embedding=self.use_cell_embedding)
             self.accelerator.backward(loss_dict["total_loss"])
@@ -413,10 +413,10 @@ class Trainer:
                     self.model.parameters(), 1.0)
             self.optimizer.step()
             self.scheduler.step()
-            self.optimizer.zero_grad()
-            self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=global_iter)
-            self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=global_iter)
-            
+            self.optimizer.zero_grad()            
+            self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=self.global_iter)
+            self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=self.global_iter)
+            self.global_iter += 1
                 
 
     @with_sdp_kernel
@@ -426,7 +426,7 @@ class Trainer:
 
         valid_loader = self.eval_loader
         all_loss_dict = defaultdict(list)
-        for batch, data_dict in tqdm(enumerate(valid_loader), total=len(valid_loader)):
+        for data_dict in tqdm(valid_loader, total=len(valid_loader)):
             loss_dict  = self.model(data_dict, use_cell_embedding=self.use_cell_embedding)
             for key, values in loss_dict.items():
                 all_loss_dict[key].append(values)
