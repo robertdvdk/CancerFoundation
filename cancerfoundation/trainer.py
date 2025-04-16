@@ -389,7 +389,7 @@ class Trainer:
         self.has_setup_trainer = True
 
     @with_sdp_kernel
-    def train(self, epoch: int, log_interval: int) -> None:
+    def train(self) -> None:
         """
         Evaluate the model on the validation dataset.
 
@@ -416,12 +416,12 @@ class Trainer:
             self.optimizer.zero_grad()            
             self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=self.global_iter)
             self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=self.global_iter)
-            self.global_iter += 1
+            self.global_iter += self.accelerator.num_processes
                 
 
     @with_sdp_kernel
     @torch.no_grad
-    def evaluate(self, epoch: int) -> Dict[str, float]:
+    def evaluate(self) -> Dict[str, float]:
         self.model.eval()
 
         valid_loader = self.eval_loader
@@ -432,6 +432,6 @@ class Trainer:
                 all_loss_dict[key].append(values)
         
         all_loss_dict = {k : self.accelerator.gather_for_metrics(torch.stack(v)).mean().item() for k, v in all_loss_dict.items()}
-        self.accelerator.log({"eval/" + k:v for k,v in all_loss_dict.items()}, step=epoch)
+        self.accelerator.log({"eval/" + k:v for k,v in all_loss_dict.items()}, step= self.global_iter)
     
             

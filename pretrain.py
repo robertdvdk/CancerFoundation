@@ -62,10 +62,10 @@ def main():
     for epoch in range(trainer.starting_epoch, epochs):
         accelerator.print(f"Epoch: {epoch}")
         accelerator.print("Training...")
-        trainer.train(epoch, log_interval=args.log_interval)
+        trainer.train()
         
         accelerator.print("Evaluating...")
-        trainer.evaluate(epoch)
+        trainer.evaluate()
         trainer.checkpoint(epoch)
     
     accelerator.end_training()
