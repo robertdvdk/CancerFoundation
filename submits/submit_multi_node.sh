@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
-#SBATCH --nodes=2
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 
 

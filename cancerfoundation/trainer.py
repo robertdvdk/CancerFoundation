@@ -13,12 +13,11 @@ from .data_collator import AnnDataCollator
 from .dataset import SingleCellDataset
 from .utils import load_pretrained
 from .model import TransformerModel
-from cancerfoundation.loss import criterion_neg_log_bernoulli, get_loss, masked_relative_error
+from cancerfoundation.loss import get_loss, masked_relative_error
 import numpy as np
 from safetensors import safe_open
 from .loss import LossType
 
-from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import random_split
 from accelerate.utils.tqdm import tqdm
 
@@ -232,7 +231,7 @@ class Trainer:
             collate_fn=collator,
             drop_last=train,
             num_workers=min(
-                 len(os.sched_getaffinity(0)), batch_size//2), ## REPLACE LATER
+                 len(os.sched_getaffinity(0)), batch_size), ## REPLACE LATER
             pin_memory=True,
         )
 
@@ -319,25 +318,6 @@ class Trainer:
         self.accelerator.wait_for_everyone()
         self.accelerator.save_state(f"{path}/accelerate")
         self.accelerator.print("Checkpointing done!")
-
-    def __log(self, metrics: Dict):
-
-        for key, val in metrics.items():
-            if hasattr(val, "item"):
-                metrics[key] = val.item()
-            else:
-                metrics[key] = val
-        if self.wandb != None:
-            self.accelerator.log(metrics)
-        else:
-            if self.accelerator.is_main_process:
-                path = f"{self.save_dir}/log.json"
-                with open(path, "r") as file:
-                    data = json.load(file)
-                data.append(metrics)
-                with open(path, "w") as file:
-                    json.dump(data, file, indent=4)
-        self.timer = None
 
     def load_model(self, pretrained_model_path: str, verbose: bool = True) -> Union[torch.nn.Module, None]:
         if pretrained_model_path.endswith(".safetensors"):
