@@ -27,7 +27,7 @@ class TransformerModel(nn.Module):
         pad_value: int,
         pad_token_id: int,
         criterion,
-        dropout: float = 0.5,
+        dropout: float = 0.0,
         do_mvc: bool = False,
         conditions: Dict = None,
         input_emb_style: str = "continuous",

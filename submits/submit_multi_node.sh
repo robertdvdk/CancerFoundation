@@ -2,6 +2,7 @@
 #SBATCH --job-name=cf-pretrain
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
+#SBATCH --time=12:00:00
 
 
 # Run job step

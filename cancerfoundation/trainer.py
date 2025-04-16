@@ -13,7 +13,7 @@ from .data_collator import AnnDataCollator
 from .dataset import SingleCellDataset
 from .utils import load_pretrained
 from .model import TransformerModel
-from cancerfoundation.loss import get_loss, masked_relative_error
+from cancerfoundation.loss import get_loss
 import numpy as np
 from safetensors import safe_open
 from .loss import LossType
@@ -231,7 +231,7 @@ class Trainer:
             collate_fn=collator,
             drop_last=train,
             num_workers=min(
-                 len(os.sched_getaffinity(0)), batch_size), ## REPLACE LATER
+                 len(os.sched_getaffinity(0)), batch_size//2), ## REPLACE LATER
             pin_memory=True,
         )
 
