@@ -15,15 +15,14 @@ LAYERS=6
 EMBSIZE=256
 JOB_NAME="cancerfoundation"
 
-ACCEL_PROCS=$(( $SLURM_NNODES * 4 ))
+export GPUS_PER_NODE=4
+head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
-MAIN_ADDR=$(echo "${SLURM_NODELIST}" | sed 's/[],].*//g; s/\[//g')
-MAIN_PORT=12848
-
-srun --environment=bionemo accelerate launch \
-    --num_machines=$SLURM_NNODES --num_processes=$ACCEL_PROCS \
-    --machine_rank $SLURM_PROCID \
-    --main_process_ip $MAIN_ADDR --main_process_port $MAIN_PORT \
+srun --environment=bionemo accelerate launch  --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
+    --num_machines $SLURM_NNODES \
+    --rdzv_backend c10d \
+    --main_process_ip $head_node_ip \
+    --main_process_port 29501 \
     ./pretrain.py \
     --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len $MAX_LENGTH \
