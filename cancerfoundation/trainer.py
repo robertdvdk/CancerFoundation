@@ -379,7 +379,7 @@ class Trainer:
         """
 
         for data_dict in tqdm(self.train_loader, total=len(self.train_loader)):
-            self.global_iter += self.accelerator.num_processes
+            self.global_iter += 1
             self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > 1000
             
             loss_dict = self.model(data_dict,use_cell_embedding=self.use_cell_embedding)
