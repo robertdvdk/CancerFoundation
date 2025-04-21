@@ -25,7 +25,7 @@ srun --environment=bionemo accelerate launch \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
     --main_process_port 29501 \
-    --mixed_precision bf16
+    --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len $MAX_LENGTH \
