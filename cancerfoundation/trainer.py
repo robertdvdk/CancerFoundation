@@ -1,4 +1,5 @@
 from collections import defaultdict
+from pathlib import Path
 import time
 import os
 from typing import Dict, List, Optional, Union
@@ -8,7 +9,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch import nn
 import torch
 import json
-
+from accelerate import Accelerator
 from .data_collator import AnnDataCollator
 from .dataset import SingleCellDataset
 from .utils import load_pretrained
@@ -59,7 +60,7 @@ class Trainer:
         conditions: List[str] = None,
         mvc_decoder_style: str = "inner product",
         scale_zero_expression: Optional[float] = None,
-        accelerator = None,
+        accelerator: Accelerator = None,
         do_dat: bool = False,
         explicit_zero_prob: Optional[bool] = False,
         balance_primary: Optional[str] = None,
@@ -160,20 +161,21 @@ class Trainer:
 
     def __initiate_wandb(self, run_id: str = None):
         assert (self.resume_from_checkpoint != None) == (run_id != None)
+        
+        init_kwargs = {
+        "entity": "cancerfoundation",
+        "config": self.args,
+        }
+        
+        if self.resume_from_checkpoint is not None:
+            init_kwargs["resume"] = "must"
+            init_kwargs["id"] = run_id
+        else:
+            init_kwargs["resume"] = "allow"
+        
         self.accelerator.init_trackers(
             project_name=self.wandb,
-            config=self.args,
-            init_kwargs={
-                "wandb": (
-                    {
-                        "entity": "cancerfoundation",
-                        "name": self.save_dir,
-                        "resume": "allow",
-                    }
-                    if self.resume_from_checkpoint == None
-                    else {"name": self.save_dir, "resume": "must", "id": run_id}
-                )
-            },
+            init_kwargs= {"wandb": init_kwargs}
         )
     
     def __create_datasets(
@@ -303,7 +305,7 @@ class Trainer:
             with open(f"{path}/info.json", "w") as json_file:
                 info = {
                     "epoch": epoch,
-                    "best_val_loss": self.best_val_loss,
+                    "global_iter": self.global_iter,
                     "run_id": (
                         self.accelerator.get_tracker("wandb").run.id
                         if self.wandb != None
@@ -340,14 +342,13 @@ class Trainer:
             self.accelerator.print(
                 f"Resume from checkpoint: {self.resume_from_checkpoint}"
             )
-            self.save_dir = self.resume_from_checkpoint.rsplit('/', 1)[0]
+            self.save_dir = Path(self.resume_from_checkpoint).parent
             self.accelerator.load_state(
                 f"{self.resume_from_checkpoint}/accelerate")
             with open(f"{self.resume_from_checkpoint}/info.json", "r") as file:
-                # Load the JSON data
                 data = json.load(file)
             self.starting_epoch = data["epoch"] + 1
-            self.best_val_loss = data["best_val_loss"]
+            self.global_iter = data["global_iter"]
         else:
             if self.accelerator.is_main_process:
                 if not os.path.exists(self.save_dir):
@@ -378,8 +379,7 @@ class Trainer:
         """
 
         for data_dict in tqdm(self.train_loader, total=len(self.train_loader)):
-            self.model.train()
-
+            self.global_iter += self.accelerator.num_processes
             self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > 1000
             
             loss_dict = self.model(data_dict,use_cell_embedding=self.use_cell_embedding)
@@ -393,7 +393,6 @@ class Trainer:
             self.optimizer.zero_grad()            
             self.accelerator.log({"train/" + k:v for k,v in loss_dict.items()}, step=self.global_iter)
             self.accelerator.log({"train/lr": self.scheduler.get_last_lr()[0]}, step=self.global_iter)
-            self.global_iter += self.accelerator.num_processes
                 
 
     @with_sdp_kernel
@@ -409,6 +408,6 @@ class Trainer:
                 all_loss_dict[key].append(values)
         
         all_loss_dict = {k : self.accelerator.gather_for_metrics(torch.stack(v)).mean().item() for k, v in all_loss_dict.items()}
-        self.accelerator.log({"eval/" + k:v for k,v in all_loss_dict.items()}, step= self.global_iter)
-    
+        self.eval_loss = all_loss_dict
+        self.accelerator.log({"eval/" + k:v for k,v in self.eval_loss.items()}, step=self.global_iter)
             

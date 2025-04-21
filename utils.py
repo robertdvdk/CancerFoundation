@@ -3,6 +3,7 @@ import sys
 
 sys.path.insert(0, "../")
 from cancerfoundation.loss import LossType
+from pathlib import Path
 
 def get_args():
     parser = argparse.ArgumentParser()

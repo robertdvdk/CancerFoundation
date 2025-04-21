@@ -5,14 +5,29 @@ import os
 
 from accelerate import DistributedDataParallelKwargs
 
+from cancerfoundation.loss import LossType
+from pathlib import Path
+
 def main():
     sys.path.insert(0, "../")
     from utils import get_args
     from cancerfoundation.trainer import Trainer
-    
     args = get_args()
-    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, log_with="wandb", kwargs_handlers=[ddp_kwargs])
+    
+    if args.resume_from_checkpoint:
+        with open(Path(args.resume_from_checkpoint).parent / "args.json", "r") as f:
+            config = json.load(f)
+        
+        for key, value in config.items():
+            if key == "resume_from_checkpoint":
+                continue
+            if key == "loss":
+                value = LossType(value)
+            
+            setattr(args, key, value)        
+        
+    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps, split_batches=True, 
+                              log_with="wandb")
 
     trainer = Trainer(
         args=args,
@@ -53,7 +68,7 @@ def main():
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     trainer.setup_training(epochs=epochs, pretrained_model_path=None)#f"{args.resume_from_checkpoint}/accelerate/model.safetensors" if args.resume_from_checkpoint else None)
 
-    if accelerator.is_main_process:
+    if accelerator.is_main_process and args.resume_from_checkpoint is None:
         with open(f"{trainer.save_dir}/args.json", "w") as file:
             args_ = args
             args_.loss = args.loss.value

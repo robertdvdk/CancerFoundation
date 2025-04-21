@@ -18,11 +18,14 @@ JOB_NAME="cancerfoundation"
 export GPUS_PER_NODE=4
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
-srun --environment=bionemo accelerate launch  --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
+srun --environment=bionemo accelerate launch \
+    --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
+    --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
     --main_process_port 29501 \
+    --mixed_precision bf16
     ./pretrain.py \
     --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len $MAX_LENGTH \
@@ -44,4 +47,4 @@ srun --environment=bionemo accelerate launch  --num_processes $((SLURM_NNODES * 
     --balance-secondary "technology" \
     --conditions "technology" \
     --do-dat \
-    --wandb "debug"
+    --wandb "fulldata"
