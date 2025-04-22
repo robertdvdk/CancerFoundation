@@ -14,6 +14,8 @@ LAYERS=6
 EMBSIZE=256
 JOB_NAME="cancerfoundation"
 
+
+
 srun --environment=bionemo accelerate launch ./pretrain.py \
     --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len $MAX_LENGTH \
