@@ -39,7 +39,7 @@ srun --environment=bionemo accelerate launch \
     $MULTIGPU_FLAG \
     --same_network \
     --num_processes $NUM_PROCESSES \
-    --num_machines $NNODES
+    --num_machines $NNODES \
     --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
