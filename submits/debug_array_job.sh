@@ -36,6 +36,7 @@ srun --environment=bionemo accelerate launch \
     --embsize $EMBSIZE \
     --d-hi 512 \
     --epochs 15 \
+    --num-epochs 1 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --log-interval $LOG_INTERVAL \

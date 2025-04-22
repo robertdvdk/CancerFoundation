@@ -218,12 +218,6 @@ def get_args():
         help="Path to the training data."
     )
     parser.add_argument(
-        "--eval-path",
-        type=str,
-        default=None,
-        help="Path to the evaluation data."
-    )
-    parser.add_argument(
         "--do-dat",
         action="store_true",
         help="Whether or not to do domain adversarial training on the conditions."
@@ -252,6 +246,12 @@ def get_args():
         type=float,
         default=None,
         help="The percentage of zero-expressed genes sampled.",
+    )
+    parser.add_argument(
+        "--num-epochs",
+        type=int,
+        default=None,
+        help="Number of epochs to train for in this run.",
     )
 
     return parser.parse_args()
