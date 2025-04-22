@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=00:30:00
-
+#SBATCH --array 0-14
 
 # Run job step
 
@@ -14,15 +14,20 @@ per_proc_batch_size=32
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
-
+SAVE_DIR="./save/resume_test"
 export GPUS_PER_NODE=4
+
+CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
+
+if [ $CURRENT_EPOCH -eq 0 ]; then
+  echo "Running first epoch (epoch $CURRENT_EPOCH)"
 
 srun --environment=bionemo accelerate launch \
     --multi_gpu \
     --num_processes 4 \
     --mixed_precision bf16 \
     ./pretrain.py \
-    --save-dir ./save/$JOB_NAME-$(date +%b%d-%H-%M-%Y) \
+    --save-dir  $SAVE_DIR \
     --max-seq-len $MAX_LENGTH \
     --batch-size $per_proc_batch_size \
     --eval-batch-size $(($per_proc_batch_size)) \
@@ -43,3 +48,15 @@ srun --environment=bionemo accelerate launch \
     --conditions "technology" \
     --do-dat \
     --wandb "debug"
+
+else
+
+CHECKPOINT_PATH="$SAVE_DIR/epoch_$PREV_EPOCH"
+
+srun --environment=bionemo accelerate launch \
+    --multi_gpu \
+    --num_processes 4 \
+    --mixed_precision bf16 \
+    ./pretrain.py \
+    --resume-from-checkpoint $CHECKPOINT_PATH \
+    --num-epochs 1
