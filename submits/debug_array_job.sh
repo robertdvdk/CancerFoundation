@@ -51,7 +51,7 @@ srun --environment=bionemo accelerate launch \
     --wandb "debug"
 
 else
-
+PREV_EPOCH=$((CURRENT_EPOCH - 1))
 CHECKPOINT_PATH="$SAVE_DIR/epoch_$PREV_EPOCH"
 
 srun --environment=bionemo accelerate launch \
