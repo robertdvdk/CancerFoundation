@@ -61,3 +61,5 @@ srun --environment=bionemo accelerate launch \
     ./pretrain.py \
     --resume-from-checkpoint $CHECKPOINT_PATH \
     --num-epochs 1
+
+fi
