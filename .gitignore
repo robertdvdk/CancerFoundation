@@ -18,6 +18,7 @@ save/
 example/
 training_data/pretraining_data/
 wandb/
+debug_data/
 
 *.png
 *.h5ad

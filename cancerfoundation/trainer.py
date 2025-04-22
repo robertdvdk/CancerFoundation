@@ -275,7 +275,7 @@ class Trainer:
             
     
     def __setup_training_variables(self, epochs: int) -> None:
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr * self.accelerator.num_processes)
 
         if self.warmup_ratio_or_step > 0:
             total_num_batches = len(self.train_loader) * epochs
@@ -283,7 +283,7 @@ class Trainer:
                 int(total_num_batches * self.warmup_ratio_or_step)
                 if self.warmup_ratio_or_step < 1
                 else int(self.warmup_ratio_or_step)
-            )
+            ) // self.accelerator.num_processes
 
             self.scheduler = transformers.get_cosine_schedule_with_warmup(
                 self.optimizer,
@@ -380,9 +380,9 @@ class Trainer:
 
         for data_dict in tqdm(self.train_loader, total=len(self.train_loader)):
             self.global_iter += 1
-            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > 1000
+            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > (1000 // self.accelerator.num_processes)
             
-            loss_dict = self.model(data_dict,use_cell_embedding=self.use_cell_embedding)
+            loss_dict = self.model(data_dict, use_cell_embedding=self.use_cell_embedding)
             self.accelerator.backward(loss_dict["total_loss"])
 
             if self.accelerator.sync_gradients:
