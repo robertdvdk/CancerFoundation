@@ -15,7 +15,7 @@ per_proc_batch_size=16
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
-SAVE_DIR="./save/full_run"
+SAVE_DIR="./save/full_suspension"
 export GPUS_PER_NODE=4
 
 CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
