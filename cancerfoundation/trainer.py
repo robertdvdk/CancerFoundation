@@ -141,7 +141,7 @@ class Trainer:
             for cond in self.conditions:
                 self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
         
-        self.train_dataset, self.eval_dataset = random_split(self.dataset, [0.9, 0.1])
+        self.train_dataset, self.eval_dataset = random_split(self.dataset, [0.95, 0.05])
         self.vocab = self.dataset.vocab
         
         self.pad_token_id = self.vocab["<pad>"]
@@ -230,7 +230,7 @@ class Trainer:
             collate_fn=collator,
             drop_last=train,
             num_workers=min(
-                 len(os.sched_getaffinity(0)), batch_size//2), ## REPLACE LATER
+                 len(os.sched_getaffinity(0)), batch_size), ## REPLACE LATER
             pin_memory=True,
         )
 
@@ -283,7 +283,7 @@ class Trainer:
                 int(total_num_batches * self.warmup_ratio_or_step)
                 if self.warmup_ratio_or_step < 1
                 else int(self.warmup_ratio_or_step)
-            ) // self.accelerator.num_processes
+            )
 
             self.scheduler = transformers.get_cosine_schedule_with_warmup(
                 self.optimizer,
@@ -297,9 +297,9 @@ class Trainer:
             )
 
     def checkpoint(self, epoch: int):
-        self.accelerator.print("Checkpointing...")
-        path = f"{self.save_dir}/epoch_{epoch}"
         if self.accelerator.is_main_process:
+            self.accelerator.print("Checkpointing...")
+            path = f"{self.save_dir}/epoch_{epoch}"
             os.makedirs(path)
             os.makedirs(f"{path}/accelerate")
             with open(f"{path}/info.json", "w") as json_file:
@@ -378,9 +378,9 @@ class Trainer:
             None
         """
 
-        for data_dict in tqdm(self.train_loader, total=len(self.train_loader)):
+        for data_dict in tqdm(self.train_loader, total=len(self.train_loader), main_process_only=True):
             self.global_iter += 1
-            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > (1000 // self.accelerator.num_processes)
+            self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_iter > 1000
             
             loss_dict = self.model(data_dict, use_cell_embedding=self.use_cell_embedding)
             self.accelerator.backward(loss_dict["total_loss"])

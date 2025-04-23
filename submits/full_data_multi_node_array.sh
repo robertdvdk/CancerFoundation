@@ -2,7 +2,7 @@
 #SBATCH --job-name=cf-pretrain
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
-#SBATCH --time=4:00:00
+#SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=4
 #SBATCH --array [0-14]%1
 
@@ -11,7 +11,7 @@
 # Run job step
 LOG_INTERVAL=16
 MAX_LENGTH=1200
-per_proc_batch_size=32
+per_proc_batch_size=16
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
