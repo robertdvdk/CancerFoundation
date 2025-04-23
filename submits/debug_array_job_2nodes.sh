@@ -3,7 +3,7 @@
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=00:15:00
-#SBATCH --array [0-1]%1
+#SBATCH --array [0-2]%1
 
 # Run job step
 
@@ -42,7 +42,7 @@ srun --environment=bionemo accelerate launch \
     --nheads 8 \
     --embsize $EMBSIZE \
     --d-hi 512 \
-    --epochs 15 \
+    --epochs 3 \
     --num-epochs 1 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
