@@ -297,9 +297,9 @@ class Trainer:
             )
 
     def checkpoint(self, epoch: int):
+        path = f"{self.save_dir}/epoch_{epoch}"
         if self.accelerator.is_main_process:
             self.accelerator.print("Checkpointing...")
-            path = f"{self.save_dir}/epoch_{epoch}"
             os.makedirs(path)
             os.makedirs(f"{path}/accelerate")
             with open(f"{path}/info.json", "w") as json_file:
