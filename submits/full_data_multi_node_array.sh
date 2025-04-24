@@ -31,7 +31,7 @@ srun --environment=bionemo accelerate launch \
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port 29501 \
+    --main_process_port 29507 \
     --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir $SAVE_DIR \
@@ -42,7 +42,7 @@ srun --environment=bionemo accelerate launch \
     --nheads 8 \
     --embsize $EMBSIZE \
     --d-hi 512 \
-    --epochs 15 \
+    --epochs 5 \
     --num-epochs 1 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
@@ -67,7 +67,7 @@ srun --environment=bionemo accelerate launch \
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port 29501 \
+    --main_process_port 29507 \
     --mixed_precision bf16 \
     ./pretrain.py \
     --resume-from-checkpoint $CHECKPOINT_PATH \
