@@ -67,7 +67,7 @@ srun --environment=bionemo accelerate launch \
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port 29501 \
+    --main_process_port 29505 \
     --mixed_precision bf16 \
     ./pretrain.py \
     --resume-from-checkpoint $CHECKPOINT_PATH \
