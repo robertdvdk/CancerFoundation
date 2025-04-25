@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
-#SBATCH --nodes=32
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=12:00:00
 #SBATCH --gpus-per-node=4
@@ -14,13 +14,15 @@ per_proc_batch_size=16
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
-SAVE_DIR="./save/cell_5_epoch_new"
+SAVE_DIR="./save/cell_5_epochs"
 export GPUS_PER_NODE=4
 
-
+CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
+if [ $CURRENT_EPOCH -eq 0 ]; then
+  echo "Running first epoch (epoch $CURRENT_EPOCH)"
 
 srun --environment=bionemo accelerate launch \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
@@ -28,7 +30,7 @@ srun --environment=bionemo accelerate launch \
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port 29511 \
+    --main_process_port 29502 \
     --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir $SAVE_DIR \
@@ -40,6 +42,7 @@ srun --environment=bionemo accelerate launch \
     --embsize $EMBSIZE \
     --d-hi 512 \
     --epochs 5 \
+    --num-epochs 1 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --log-interval $LOG_INTERVAL \
@@ -53,3 +56,20 @@ srun --environment=bionemo accelerate launch \
     --do-dat \
     --wandb "fulldata"
 
+else
+PREV_EPOCH=$((CURRENT_EPOCH - 1))
+CHECKPOINT_PATH="$SAVE_DIR/epoch_$PREV_EPOCH"
+
+srun --environment=bionemo accelerate launch \
+    --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
+    --num_machines $SLURM_NNODES \
+    --machine_rank $SLURM_PROCID \
+    --rdzv_backend c10d \
+    --main_process_ip $head_node_ip \
+    --main_process_port 29502 \
+    --mixed_precision bf16 \
+    ./pretrain.py \
+    --resume-from-checkpoint $CHECKPOINT_PATH \
+    --num-epochs 1
+
+fi
