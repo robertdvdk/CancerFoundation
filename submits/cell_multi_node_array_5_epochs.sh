@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
-#SBATCH --nodes=16
+#SBATCH --nodes=32
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=12:00:00
 #SBATCH --gpus-per-node=4
