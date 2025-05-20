@@ -10,7 +10,7 @@
 # Run job step
 LOG_INTERVAL=16
 MAX_LENGTH=1200
-per_proc_batch_size=1024
+per_proc_batch_size=512
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
