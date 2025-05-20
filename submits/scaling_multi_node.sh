@@ -4,6 +4,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=12:00:00
 #SBATCH --gpus-per-node=4
+#SBATCH --gpu-bind=per_task:1
 
 
 
@@ -25,7 +26,6 @@ srun --environment=bionemo ${JOBREPORT} -o report -- accelerate launch \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
     --machine_rank $SLURM_PROCID \
-    --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
     --main_process_port 29502 \
     --mixed_precision bf16 \
