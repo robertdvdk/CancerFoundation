@@ -21,9 +21,6 @@ CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
-if [ $CURRENT_EPOCH -eq 0 ]; then
-  echo "Running first epoch (epoch $CURRENT_EPOCH)"
-
 srun --environment=bionemo ${JOBREPORT} -o report -- accelerate launch \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
