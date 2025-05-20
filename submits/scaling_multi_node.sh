@@ -14,7 +14,7 @@ per_proc_batch_size=256
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
-SAVE_DIR="./save/debug_data_${SLURM_NNODES}"
+SAVE_DIR="./save/scaling_data_${SLURM_NNODES}"
 export GPUS_PER_NODE=4
 
 CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
@@ -45,7 +45,7 @@ srun --environment=bionemo ${JOBREPORT} -o report -- accelerate launch \
     --log-interval $LOG_INTERVAL \
     --trunc-by-sample \
     --loss "mse" \
-    --train-path "./debug_data/" \
+    --train-path "./pretraining_cells" \
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
