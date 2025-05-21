@@ -1,10 +1,11 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
 #SBATCH --time=12:00:00
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-gpu=1
 #SBATCH --gpus-per-node=4
 #SBATCH --cpus-per-task=72
 #SBATCH --gpu-bind=per_task:1
+#SBATCH --gres=gpu:4
 
 # Run job step
 LOG_INTERVAL=16
@@ -15,19 +16,15 @@ EMBSIZE=256
 JOB_NAME="debug"
 SAVE_DIR="./save/scaling_data_${SLURM_NNODES}"
 export GPUS_PER_NODE=4
-PORT=$(shuf -i 40000-65000 -n 1)
+export PORT=$(shuf -i 40000-65000 -n 1)
 CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
 srun --environment=bionemo --export=ALL,LOCAL_RANK=\$SLURM_LOCALID ${JOBREPORT} -o report -- accelerate launch \
-    --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
-    --num_machines $SLURM_NNODES \
     --machine_rank $SLURM_PROCID \
-    --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
     --main_process_port $PORT \
-    --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir $SAVE_DIR \
     --max-seq-len $MAX_LENGTH \
@@ -48,8 +45,6 @@ srun --environment=bionemo --export=ALL,LOCAL_RANK=\$SLURM_LOCALID ${JOBREPORT} 
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
-    --conditions "technology" \
-    --do-dat \
     --wandb "fulldata"
 
 ${JOBREPORT} print report
