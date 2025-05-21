@@ -3,7 +3,6 @@
 #SBATCH --ntasks-per-gpu=1
 #SBATCH --time=12:00:00
 #SBATCH --gpus-per-node=4
-#SBATCH --gpu-bind=per_task:1
 
 
 # Run job step
