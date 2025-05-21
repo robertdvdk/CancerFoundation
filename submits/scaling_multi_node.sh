@@ -1,7 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-gpu=1
 #SBATCH --time=12:00:00
 #SBATCH --gpus-per-node=4
 #SBATCH --gpu-bind=per_task:1
@@ -16,7 +15,7 @@ EMBSIZE=256
 JOB_NAME="debug"
 SAVE_DIR="./save/scaling_data_${SLURM_NNODES}"
 export GPUS_PER_NODE=4
-
+PORT=$(($RANDOM + ($RANDOM % 2) * 32768))
 CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
@@ -27,7 +26,7 @@ srun --environment=bionemo ${JOBREPORT} -o report -- accelerate launch \
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port 29502 \
+    --main_process_port $PORT \
     --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir $SAVE_DIR \
