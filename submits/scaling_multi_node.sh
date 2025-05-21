@@ -1,13 +1,15 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
 #SBATCH --time=12:00:00
-
-
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=4
+#SBATCH --cpus-per-task=72
+#SBATCH --gpu-bind=per_task:1
 
 # Run job step
 LOG_INTERVAL=16
 MAX_LENGTH=1200
-per_proc_batch_size=256
+per_proc_batch_size=128
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
