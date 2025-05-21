@@ -25,7 +25,7 @@ srun --environment=bionemo --export=ALL,LOCAL_RANK=\$SLURM_LOCALID ${JOBREPORT} 
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port $PORT \
+    --main_process_port 0 \
     --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir $SAVE_DIR \
