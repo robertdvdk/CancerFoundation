@@ -1,8 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
-#SBATCH --ntasks-per-gpu=1
 #SBATCH --time=12:00:00
-#SBATCH --gpus-per-node=4
+
 
 
 # Run job step
