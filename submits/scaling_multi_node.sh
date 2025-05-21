@@ -4,6 +4,7 @@
 #SBATCH --cpus-per-task=72
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
+#SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=96
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
@@ -69,5 +70,5 @@ LAUNCHER="accelerate launch \
 
 
 
-srun -ul --environment=bionemo ${JOBREPORT} -- --ignore-gpu-binding -o report -- $LAUNCHER $CMD
+srun -ul --environment=bionemo ${JOBREPORT} -o report -- $LAUNCHER $CMD
 ${JOBREPORT} print report
