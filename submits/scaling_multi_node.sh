@@ -4,7 +4,6 @@
 #SBATCH --ntasks-per-gpu=1
 #SBATCH --gpus-per-node=4
 #SBATCH --cpus-per-task=72
-#SBATCH --gpu-bind=per_task:1
 
 # Run job step
 LOG_INTERVAL=16
