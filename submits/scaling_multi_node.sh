@@ -5,7 +5,6 @@
 #SBATCH --gpus-per-node=4
 #SBATCH --cpus-per-task=72
 #SBATCH --gpu-bind=per_task:1
-#SBATCH --gres=gpu:4
 
 # Run job step
 LOG_INTERVAL=16
