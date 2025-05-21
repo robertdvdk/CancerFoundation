@@ -14,7 +14,7 @@ EMBSIZE=256
 JOB_NAME="debug"
 SAVE_DIR="./save/scaling_data_${SLURM_NNODES}"
 export GPUS_PER_NODE=4
-PORT=$(shuf -i 20000-65000 -n 1)
+PORT=$(shuf -i 40000-65000 -n 1)
 CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
@@ -25,7 +25,7 @@ srun --environment=bionemo --export=ALL,LOCAL_RANK=\$SLURM_LOCALID ${JOBREPORT} 
     --machine_rank $SLURM_PROCID \
     --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
-    --main_process_port 0 \
+    --main_process_port $PORT \
     --mixed_precision bf16 \
     ./pretrain.py \
     --save-dir $SAVE_DIR \
