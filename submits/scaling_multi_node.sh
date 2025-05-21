@@ -15,7 +15,7 @@ EMBSIZE=256
 JOB_NAME="debug"
 SAVE_DIR="./save/scaling_data_${SLURM_NNODES}"
 export GPUS_PER_NODE=4
-PORT=$(($RANDOM + ($RANDOM % 2) * 32768))
+PORT=$(shuf -i 20000-65000 -n 1)
 CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
