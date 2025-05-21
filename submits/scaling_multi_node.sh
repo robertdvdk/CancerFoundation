@@ -7,7 +7,6 @@
 #SBATCH --gpu-bind=per_task:1
 
 
-
 # Run job step
 LOG_INTERVAL=16
 MAX_LENGTH=1200
@@ -26,6 +25,7 @@ srun --environment=bionemo ${JOBREPORT} -o report -- accelerate launch \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
     --machine_rank $SLURM_PROCID \
+    --rdzv_backend c10d \
     --main_process_ip $head_node_ip \
     --main_process_port 29502 \
     --mixed_precision bf16 \
