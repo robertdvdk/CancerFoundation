@@ -1,9 +1,8 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
 #SBATCH --time=12:00:00
-#SBATCH --cpus-per-task=72
 #SBATCH --nodes=4
-#SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
+#SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=72
 #SBATCH --gres=gpu:4
@@ -33,7 +32,7 @@ export PORT=$(shuf -i 40000-65000 -n 1)
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
-srun --environment=bionemo bash -c "${JOBREPORT} -o report -- accelerate launch \
+srun --environment=bionemo bash -c "echo $SLURM_PROCID; ${JOBREPORT} -o report -- accelerate launch \
     --multi_gpu \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
@@ -58,7 +57,7 @@ srun --environment=bionemo bash -c "${JOBREPORT} -o report -- accelerate launch 
     --log-interval $LOG_INTERVAL \
     --trunc-by-sample \
     --loss "mse" \
-    --train-path "./pretraining_cells" \
+    --train-path "./debug_data" \
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
