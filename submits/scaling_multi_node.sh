@@ -61,6 +61,6 @@ srun --environment=bionemo ${JOBREPORT} -o report -- bash -c "accelerate launch 
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
-    --wandb "fulldata"
+    --wandb "fulldata""
 
 ${JOBREPORT} print report
