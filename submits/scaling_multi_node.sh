@@ -64,6 +64,6 @@ srun --environment=bionemo ${JOBREPORT} -o report -- bash -c "accelerate launch 
     --rdzv_backend c10d \
     --main_process_ip $MASTER_ADDR \
     --main_process_port $MASTER_PORT \
-    --mixed_precision bf16 \
+    --mixed_precision bf16" \
     $CMD
 ${JOBREPORT} print report
