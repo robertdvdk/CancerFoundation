@@ -17,6 +17,9 @@ MASTER_PORT=$(shuf -i 40000-65000 -n 1)
 NNODES=$SLURM_NNODES
 
 
+TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+REPORT_PATH="report_$SLURM_JOB_ID"
+
 LOG_INTERVAL=16
 MAX_LENGTH=1200
 per_proc_batch_size=128
@@ -30,7 +33,7 @@ export PORT=$(shuf -i 40000-65000 -n 1)
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
-srun --environment=bionemo bash -c "echo $SLURM_PROCID; ${JOBREPORT} --ignore-gpu-binding -o report -- accelerate launch \
+srun --environment=bionemo bash -c "echo $SLURM_PROCID; ${JOBREPORT} --ignore-gpu-binding -o $REPORT_PATH -- accelerate launch \
     --multi_gpu \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
@@ -61,4 +64,4 @@ srun --environment=bionemo bash -c "echo $SLURM_PROCID; ${JOBREPORT} --ignore-gp
     --balance-secondary "technology" \
     --wandb "fulldata""
 
-${JOBREPORT} print report
+${JOBREPORT} print $REPORT_PATH
