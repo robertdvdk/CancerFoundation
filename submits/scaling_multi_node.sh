@@ -62,6 +62,7 @@ srun --environment=bionemo bash -c "echo \$SLURM_PROCID; ${JOBREPORT} --ignore-g
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
+    --grad-accu-steps 8 \
     --wandb "fulldata""
 
 ${JOBREPORT} print $REPORT_PATH
