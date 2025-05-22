@@ -33,7 +33,7 @@ export PORT=$(shuf -i 40000-65000 -n 1)
 
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
-srun --environment=bionemo bash -c "echo $SLURM_PROCID; ${JOBREPORT} --ignore-gpu-binding -o $REPORT_PATH -- accelerate launch \
+srun --environment=bionemo bash -c "echo \$SLURM_PROCID; ${JOBREPORT} --ignore-gpu-binding -o $REPORT_PATH -- accelerate launch \
     --multi_gpu \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
