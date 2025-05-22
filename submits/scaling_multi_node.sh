@@ -58,7 +58,7 @@ srun --environment=bionemo bash -c "echo \$SLURM_PROCID; ${JOBREPORT} --ignore-g
     --log-interval $LOG_INTERVAL \
     --trunc-by-sample \
     --loss "mse" \
-    --train-path "./debug_data" \
+    --train-path "./pretraining_cells/" \
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
