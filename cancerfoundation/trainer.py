@@ -230,7 +230,7 @@ class Trainer:
             collate_fn=collator,
             drop_last=train,
             num_workers=min(
-                 len(os.sched_getaffinity(0)), batch_size, 16), ## REPLACE LATER
+                 len(os.sched_getaffinity(0)), batch_size), ## REPLACE LATER
             pin_memory=True,
         )
 
