@@ -28,8 +28,20 @@ EMBSIZE=256
 JOB_NAME="debug"
 SAVE_DIR="./save/scaling_data_${SLURM_NNODES}"
 
+export GPUS_PER_NODE=4
+export PORT=$(shuf -i 40000-65000 -n 1)
 
-CMD="./pretrain.py \
+head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
+
+srun --environment=bionemo ${JOBREPORT} -o report -- bash -c "accelerate launch \
+    --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
+    --num_machines $SLURM_NNODES \
+    --machine_rank \$SLURM_PROCID \
+    --rdzv_backend c10d \
+    --main_process_ip $MASTER_ADDR \
+    --main_process_port $MASTER_PORT \
+    --mixed_precision bf16 \
+    ./pretrain.py \
     --save-dir $SAVE_DIR \
     --max-seq-len $MAX_LENGTH \
     --batch-size $per_proc_batch_size \
@@ -49,21 +61,6 @@ CMD="./pretrain.py \
     --zero-percentages 0.2 0.4 0.6 \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
-    --wandb "fulldata""
+    --wandb "fulldata"
 
-export GPUS_PER_NODE=4
-export PORT=$(shuf -i 40000-65000 -n 1)
-CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
-
-head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
-
-srun --environment=bionemo ${JOBREPORT} -o report -- bash -c "accelerate launch \
-    --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
-    --num_machines $SLURM_NNODES \
-    --machine_rank \$SLURM_PROCID \
-    --rdzv_backend c10d \
-    --main_process_ip $MASTER_ADDR \
-    --main_process_port $MASTER_PORT \
-    --mixed_precision bf16" \
-    $CMD
 ${JOBREPORT} print report
