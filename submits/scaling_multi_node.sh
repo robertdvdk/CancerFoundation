@@ -18,8 +18,6 @@ GPUS_PER_NODE=4
 MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 MASTER_PORT=$(shuf -i 40000-65000 -n 1)
 NNODES=$SLURM_NNODES
-NODE_RANK=$SLURM_PROCID 
-WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
 
 LOG_INTERVAL=16
@@ -53,22 +51,19 @@ CMD="./pretrain.py \
     --balance-secondary "technology" \
     --wandb "fulldata""
 
+export GPUS_PER_NODE=4
+export PORT=$(shuf -i 40000-65000 -n 1)
+CURRENT_EPOCH=$SLURM_ARRAY_TASK_ID
 
-LAUNCHER="accelerate launch \
-    --multi_gpu \
-    --num_machines $NNODES \
-    --num_processes $WORLD_SIZE \
-    --main_process_ip "$MASTER_ADDR" \
-    --main_process_port $MASTER_PORT \
-    --num_processes $WORLD_SIZE \
+head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
+
+srun --environment=bionemo ${JOBREPORT} -o report -- bash -c "accelerate launch \
+    --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
+    --num_machines $SLURM_NNODES \
     --machine_rank \$SLURM_PROCID \
-    --role $SLURMD_NODENAME: \
-    --rdzv_conf rdzv_backend=c10d \
-    --max_restarts 0 \
-    --tee 3 \
-"
-
-
-
-srun -ul --environment=bionemo ${JOBREPORT} -o report -- $LAUNCHER $CMD
+    --rdzv_backend c10d \
+    --main_process_ip $MASTER_ADDR \
+    --main_process_port $MASTER_PORT \
+    --mixed_precision bf16 \
+    $CMD
 ${JOBREPORT} print report
