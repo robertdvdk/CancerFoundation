@@ -5,7 +5,7 @@
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
 #SBATCH --gpus-per-task=4
-#SBATCH --cpus-per-task=96
+#SBATCH --cpus-per-task=72
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 
@@ -34,6 +34,7 @@ export PORT=$(shuf -i 40000-65000 -n 1)
 head_node_ip=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 
 srun --environment=bionemo bash -c "${JOBREPORT} -o report -- accelerate launch \
+    --multi_gpu \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
     --num_machines $SLURM_NNODES \
     --machine_rank \$SLURM_PROCID \
