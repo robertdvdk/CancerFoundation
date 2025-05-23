@@ -1,7 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
 #SBATCH --time=12:00:00
-#SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=72
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
