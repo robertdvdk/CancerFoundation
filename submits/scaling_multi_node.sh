@@ -36,7 +36,7 @@ export GPUS_PER_NODE=4
 srun --environment=bionemo bash -c "echo \$SLURM_PROCID; ${JOBREPORT} --ignore-gpu-binding -o $REPORT_PATH -- python \
     ./pretrain.py \
     --gpus $((GPUS_PER_NODE * SLURM_NNODES)) \
-    --strategy auto \
+    --strategy "ddp_find_unused_parameters_true" \
     --save-dir $SAVE_DIR \
     --max-seq-len $MAX_LENGTH \
     --batch-size $per_proc_batch_size \
