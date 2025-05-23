@@ -150,7 +150,7 @@ def main():
     save_dir="./checkpoints",
     wandb_project="cancer_foundation",
     strategy=args.strategy,
-    precision="bf16",
+    precision="bf16-mixed",
 )
 
 

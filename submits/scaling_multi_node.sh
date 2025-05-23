@@ -33,7 +33,7 @@ export GPUS_PER_NODE=4
 
 srun --environment=bionemo bash -c "echo \$SLURM_PROCID; ${JOBREPORT} --ignore-gpu-binding -o $REPORT_PATH -- python \
     ./pretrain.py \
-    --gpus $((GPUS_PER_NODE * SLURM_NNODES)) \
+    --gpus $GPUS_PER_NODE \
     --num-nodes $SLURM_NNODES \
     --strategy "ddp_find_unused_parameters_true" \
     --save-dir $SAVE_DIR \
