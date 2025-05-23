@@ -4,33 +4,114 @@ from accelerate import Accelerator
 import os 
 
 from accelerate import DistributedDataParallelKwargs
-
+sys.path.insert(0, "../")
+from utils import get_args
 from cancerfoundation.loss import LossType
+from cancerfoundation.model.model import TransformerModel
+from cancerfoundation.trainer import LightningModule
 from pathlib import Path
+import pytorch_lightning as pl
+from pytorch_lightning.loggers import WandbLogger
+
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+
+def train_model(
+    lightning_module: LightningModule,
+    max_epochs: int,
+    save_dir: str,
+    num_nodes: int = 1,
+    gpus: int = 4,
+    wandb_project: str = None,
+    resume_from_checkpoint: str = None,
+    precision: str = "bf16",
+    strategy: str = "auto",    
+    gradient_clip_val: float = 1.0,
+    accumulate_grad_batches: int = 1,
+    check_val_every_n_epoch: int = 1,
+    pretrained_model_path: str = None,
+):
+    """
+    Train the model using PyTorch Lightning Trainer
+    
+    Args:
+        lightning_module: The LightningModule to train
+        max_epochs: Maximum number of epochs
+        save_dir: Directory to save checkpoints
+        wandb_project: Wandb project name for logging
+        resume_from_checkpoint: Path to checkpoint to resume from
+        accelerator: Accelerator type ('cpu', 'gpu', 'tpu', 'auto')
+        devices: Number of devices to use ('auto', int, or list)
+        strategy: Training strategy ('auto', 'ddp', 'deepspeed', etc.)
+        precision: Precision ('16-mixed', '32', 'bf16-mixed')
+        accumulate_grad_batches: Number of batches to accumulate gradients
+        gradient_clip_val: Gradient clipping value
+        check_val_every_n_epoch: Validation frequency
+        pretrained_model_path: Path to pretrained model weights
+    """
+    
+    # Load pretrained weights if provided
+    if pretrained_model_path:
+        lightning_module.load_pretrained_weights(pretrained_model_path)
+    
+    # Setup callbacks
+    callbacks = []
+    
+    # Model checkpointing
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=save_dir,
+        filename='epoch_{epoch:02d}-val_loss_{val/total_loss:.2f}',
+        monitor='val/total_loss',
+        mode='min',
+        save_top_k=3,
+        save_last=True,
+        auto_insert_metric_name=False,
+    )
+    callbacks.append(checkpoint_callback)
+    
+    # Learning rate monitoring
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+    callbacks.append(lr_monitor)
+    
+    # Setup logger
+    logger = None
+    if wandb_project:
+        logger = WandbLogger(
+            project=wandb_project,
+            entity="cancerfoundation",
+            config=lightning_module.args,
+        )
+    
+    # Create trainer
+    trainer = pl.Trainer(
+        max_epochs=max_epochs,
+        accelerator="gpu",
+        devices=gpus,
+        num_nodes=num_nodes,
+        strategy=strategy,
+        precision=precision,
+        accumulate_grad_batches=accumulate_grad_batches,
+        gradient_clip_val=gradient_clip_val,
+        check_val_every_n_epoch=check_val_every_n_epoch,
+        callbacks=callbacks,
+        logger=logger,
+        log_every_n_steps=50,
+        enable_progress_bar=True,
+        enable_model_summary=True,
+    )
+    
+    # Start training
+    trainer.fit(
+        lightning_module,
+        ckpt_path=resume_from_checkpoint
+    )
+    
+    return trainer
+
+
 
 def main():
-    sys.path.insert(0, "../")
-    from utils import get_args
-    from cancerfoundation.trainer import Trainer
     args = get_args()
-    
-    if args.resume_from_checkpoint:
-        with open(Path(args.resume_from_checkpoint).parent / "args.json", "r") as f:
-            config = json.load(f)
-        
-        for key, value in config.items():
-            if key in ("resume_from_checkpoint", "num_epochs"):
-                continue
-            if key == "loss":
-                value = LossType(value)
-            
-            setattr(args, key, value)        
-    
-    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    accelerator = Accelerator(gradient_accumulation_steps=args.grad_accu_steps,
-                              log_with="wandb", kwargs_handlers=[ddp_kwargs])
-
-    trainer = Trainer(
+    trainer = LightningModule(
         args=args,
         n_bins=args.n_bins,
         input_emb_style=args.input_emb_style,
@@ -50,12 +131,8 @@ def main():
         warmup_ratio_or_step=args.warmup_ratio_or_step,
         scheduler_interval=args.scheduler_interval,
         scheduler_factor=args.scheduler_factor,
-        save_dir=args.save_dir,
-        accelerator=accelerator,
         loss_type=args.loss,
         do_dat=args.do_dat,
-        resume_from_checkpoint=args.resume_from_checkpoint,
-        wandb = args.wandb,
         conditions = args.conditions,
         mvc_decoder_style=args.mvc_decoder_style,
         scale_zero_expression=args.scale_zero_expression,
@@ -64,29 +141,17 @@ def main():
         balance_primary=args.balance_primary,
         balance_secondary=args.balance_secondary,
     )
-
-    epochs=args.epochs
-    trainer.setup_training(epochs=epochs, pretrained_model_path=None)#f"{args.resume_from_checkpoint}/accelerate/model.safetensors" if args.resume_from_checkpoint else None)
-    max_epochs = epochs if args.num_epochs is None else trainer.starting_epoch + args.num_epochs
-    accelerator.print(f"Training for {max_epochs}.")
     
-    
-    if accelerator.is_main_process and args.resume_from_checkpoint is None:
-        with open(f"{trainer.save_dir}/args.json", "w") as file:
-            args_ = args
-            args_.loss = args.loss.value
-            json.dump(vars(args_), file, indent=4)
-
-    for epoch in range(trainer.starting_epoch, max_epochs):
-        accelerator.print(f"Epoch: {epoch}")
-        accelerator.print("Training...")
-        trainer.train()
-        
-        accelerator.print("Evaluating...")
-        trainer.evaluate()
-        trainer.checkpoint(epoch)
-    
-    accelerator.end_training()
+    train_model(
+    lightning_module=trainer,
+    max_epochs=100,
+    num_nodes=args.num_nodes,
+    gpus=args.gpus,
+    save_dir="./checkpoints",
+    wandb_project="cancer_foundation",
+    strategy=args.strategy,
+    precision="16-mixed",
+)
 
 
 

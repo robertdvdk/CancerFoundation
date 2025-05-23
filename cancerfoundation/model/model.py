@@ -11,11 +11,18 @@ from tqdm import trange
 
 from cancerfoundation.loss import LossType, criterion_neg_log_bernoulli, get_loss, masked_relative_error
 from .grad_reverse import grad_reverse
-
+import lightning as pl
 from .layers import CFLayer, CFGenerator
 
 
-class TransformerModel(nn.Module):
+def with_sdp_kernel(func):
+    def wrapped_func(*args, **kwargs):
+        with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
+            return func(*args, **kwargs)
+    return wrapped_func
+
+
+class TransformerModel(pl.LightningModule):
     def __init__(
         self,
         ntoken: int,
@@ -539,8 +546,11 @@ class TransformerModel(nn.Module):
           
         loss_dict["total_loss"] = loss       
         return loss_dict
-            
-            
+        
+    @with_sdp_kernel
+    def training_step(self, batch, batch_idx):
+        loss_dict = self.model(batch, use_cell_embedding=False)
+        return loss_dict["total_loss"]
 
     def generative_forward(
         self,

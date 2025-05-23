@@ -34,7 +34,22 @@ def get_args():
         help="The number of highly variable genes. If set to 0, will use all genes. "
         "Default is None, which will determine the n_hvg automatically.",
     )
-
+    parser.add_argument(
+        "--num-nodes",
+        type=int,
+        default=1,
+        help="The number of gradient accumulation steps. Default is 1.",
+    )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="auto",
+    )
+    parser.add_argument(
+        "--gpus",
+        type=int,
+        default=1,
+    )
     parser.add_argument(
         "--grad-accu-steps",
         type=int,
