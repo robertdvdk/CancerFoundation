@@ -149,6 +149,7 @@ def main():
     gpus=args.gpus,
     save_dir="./checkpoints",
     wandb_project="cancer_foundation",
+    accumulate_grad_batches=args.grad_accu_steps,
     strategy=args.strategy,
     precision="bf16-mixed",
 )
