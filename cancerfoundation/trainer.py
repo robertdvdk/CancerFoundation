@@ -187,7 +187,7 @@ class LightningModule(pl.LightningModule):
         
         # Log training metrics
         for key, value in loss_dict.items():
-            self.log(f"train/{key}", value, on_step=True, on_epoch=True, prog_bar=True)
+            self.log(f"train/{key}", value, on_step=True, on_epoch=False, prog_bar=True)
         
         return loss_dict["total_loss"]
 
@@ -197,7 +197,7 @@ class LightningModule(pl.LightningModule):
         
         # Log validation metrics
         for key, value in loss_dict.items():
-            self.log(f"val/{key}", value, on_step=False, on_epoch=True, prog_bar=True)
+            self.log(f"val/{key}", value, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss_dict
 
