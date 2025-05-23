@@ -22,7 +22,7 @@ REPORT_PATH="report_$SLURM_JOB_ID"
 
 LOG_INTERVAL=16
 MAX_LENGTH=1200
-per_proc_batch_size=256
+per_proc_batch_size=128
 LAYERS=6
 EMBSIZE=256
 JOB_NAME="debug"
