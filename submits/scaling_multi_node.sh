@@ -41,7 +41,7 @@ srun --environment=bionemo bash -c "echo \$SLURM_PROCID; ${JOBREPORT} --ignore-g
     --batch-size $per_proc_batch_size \
     --eval-batch-size $(($per_proc_batch_size)) \
     --nlayers $LAYERS \
-    --nheads 8 \
+    --nheads 16 \
     --embsize $EMBSIZE \
     --d-hi 512 \
     --epochs 5 \
