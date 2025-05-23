@@ -97,7 +97,6 @@ def train_model(
         log_every_n_steps=50,
         enable_progress_bar=True,
         enable_model_summary=True,
-        profiler="simple"
     )
     
     # Start training
