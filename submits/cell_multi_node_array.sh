@@ -2,7 +2,7 @@
 #SBATCH --job-name=cf-pretrain
 
 srun --environment=bionemo python pretrain.py \
-    --gpus 2 \
+    --gpus 4 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
     --batch-size 32 \
