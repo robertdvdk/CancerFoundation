@@ -77,7 +77,6 @@ def train_model(
     if wandb_project:
         logger = WandbLogger(
             project=wandb_project,
-            entity="cancerfoundation",
             config=lightning_module.args,
         )
     
