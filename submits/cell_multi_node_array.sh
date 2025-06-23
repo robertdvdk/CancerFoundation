@@ -5,8 +5,8 @@ srun --environment=bionemo python pretrain.py \
     --gpus 4 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 32 \
-    --eval-batch-size 32 \
+    --batch-size 64 \
+    --eval-batch-size 64 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 256 \
