@@ -23,4 +23,5 @@ singularity run --pwd /cluster/work/boeva/fbarkmann/CancerFoundation --bind /clu
     --conditions "technology" \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
-    --wandb "cells"
+    --wandb "cells" \
+    --strategy "ddp_find_unused_parameters_true"
