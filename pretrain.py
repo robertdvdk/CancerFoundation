@@ -143,7 +143,7 @@ def main():
     
     train_model(
     lightning_module=trainer,
-    max_epochs=1,
+    max_epochs=args.epochs,
     num_nodes=args.num_nodes,
     gpus=args.gpus,
     save_dir="./checkpoints",
