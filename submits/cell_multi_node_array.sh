@@ -22,4 +22,5 @@ srun --environment=bionemo python pretrain.py \
     --conditions "technology" \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
-    --wandb "cells"
+    --wandb "cells" \
+    --strategy='ddp_find_unused_parameters_true'
