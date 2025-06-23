@@ -1,4 +1,5 @@
-
+#!/bin/bash -l
+#SBATCH --job-name=cf-pretrain
 
 singularity run --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif python pretrain.py \
     --gpus 4 \
