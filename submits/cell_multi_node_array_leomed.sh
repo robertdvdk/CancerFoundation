@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=cf-pretrain
 
-singularity run --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif python pretrain.py \
+singularity run --pwd /cluster/work/boeva/fbarkmann/CancerFoundation --bind /cluster/work/boeva/fbarkmann/CancerFoundation:/cluster/work/boeva/fbarkmann/CancerFoundation --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif python pretrain.py \
     --gpus 4 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
