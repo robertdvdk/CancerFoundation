@@ -38,7 +38,7 @@ srun --environment=bionemo accelerate launch \
     --d-hi 512 \
     --epochs 15 \
     --lr 0.0001 \
-    --warmup-ratio-or-step 10000 \
+    --warmup-ratio-or-step 1000 \
     --log-interval $LOG_INTERVAL \
     --trunc-by-sample \
     --loss "mse" \
