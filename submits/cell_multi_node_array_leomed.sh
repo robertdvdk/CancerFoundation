@@ -13,7 +13,7 @@ singularity run --pwd /cluster/work/boeva/fbarkmann/CancerFoundation --bind /clu
     --d-hi 512 \
     --epochs 2 \
     --lr 0.0001 \
-    --warmup-ratio-or-step 10000 \
+    --warmup-ratio-or-step 1000 \
     --log-interval 32 \
     --grad-accu-steps 2 \
     --trunc-by-sample \
