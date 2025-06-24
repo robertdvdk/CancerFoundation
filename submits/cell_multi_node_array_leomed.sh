@@ -11,7 +11,7 @@ singularity run --pwd /cluster/work/boeva/fbarkmann/CancerFoundation --bind /clu
     --nheads 8 \
     --embsize 256 \
     --d-hi 512 \
-    --epochs 15 \
+    --epochs 2 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --log-interval 32 \

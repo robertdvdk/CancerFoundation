@@ -43,6 +43,7 @@ class LightningModule(pl.LightningModule):
         nlayers: int,
         dropout: float,
         lr: float,
+        epochs: int,
         warmup_ratio_or_step: float,
         scheduler_interval: int,
         scheduler_factor: float,
@@ -56,7 +57,6 @@ class LightningModule(pl.LightningModule):
         balance_primary: Optional[str] = None,
         balance_secondary: Optional[str] = None,
         zero_percentages: Optional[List[float]] = None,
-        epochs: int = 100,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -207,7 +207,7 @@ class LightningModule(pl.LightningModule):
 
         if self.warmup_ratio_or_step > 0:
             # Calculate total training steps
-            total_num_batches = len(self.train_dataloader()) * self.epochs
+            total_num_batches = self.trainer.estimated_stepping_batches
             warmup_steps = (
                 int(total_num_batches * self.warmup_ratio_or_step)
                 if self.warmup_ratio_or_step < 1

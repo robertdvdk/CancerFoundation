@@ -127,6 +127,7 @@ def main():
         nlayers=args.nlayers,
         dropout=args.dropout,
         lr=args.lr,
+        epochs=args.epochs,
         warmup_ratio_or_step=args.warmup_ratio_or_step,
         scheduler_interval=args.scheduler_interval,
         scheduler_factor=args.scheduler_factor,
