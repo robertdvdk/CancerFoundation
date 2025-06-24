@@ -59,12 +59,8 @@ def train_model(
     # Model checkpointing
     checkpoint_callback = ModelCheckpoint(
         dirpath=save_dir,
-        filename='epoch_{epoch:02d}-val_loss_{val/total_loss:.2f}',
-        monitor='val/total_loss',
-        mode='min',
-        save_top_k=3,
-        save_last=True,
-        auto_insert_metric_name=False,
+        filename='epoch_{epoch:02d}',
+        every_n_epochs=1
     )
     callbacks.append(checkpoint_callback)
     
@@ -147,7 +143,7 @@ def main():
     max_epochs=args.epochs,
     num_nodes=args.num_nodes,
     gpus=args.gpus,
-    save_dir="./checkpoints",
+    save_dir=args.save_dir,
     wandb_project="cancer_foundation",
     accumulate_grad_batches=args.grad_accu_steps,
     strategy=args.strategy,
