@@ -1,5 +1,5 @@
-from .model import (
-    TransformerModel,
+from .module import (
+    TransformerModule,
     GeneEncoder,
     AdversarialDiscriminator,
     MVCDecoder,

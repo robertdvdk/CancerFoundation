@@ -3,7 +3,7 @@ from typing import Dict, List, Mapping, Optional, Tuple
 
 import torch
 import numpy as np
-from .preprocess import binning
+from cancerfoundation.data.preprocess import binning
 
 
 @dataclass

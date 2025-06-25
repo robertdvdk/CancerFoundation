@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import WeightedRandomSampler
 
-from cancerfoundation.dataset import SingleCellDataset
+from cancerfoundation.data.dataset import SingleCellDataset
 from torch.utils.data import Subset
 
 def scale_proportions_balanced(proportions, scale_factor, max_scale=5):

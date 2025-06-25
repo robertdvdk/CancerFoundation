@@ -1,34 +1,34 @@
 import json
 import sys 
 from accelerate import Accelerator
-import os 
+import os
+from typing import Optional
 
-from accelerate import DistributedDataParallelKwargs
 sys.path.insert(0, "../")
 from utils import get_args
 from cancerfoundation.loss import LossType
-from cancerfoundation.model.model import TransformerModel
-from cancerfoundation.trainer import LightningModule
-from pathlib import Path
+from cancerfoundation.model.model import CancerFoundation
+from cancerfoundation.data.data_module import SingleCellDataModule
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 
 def train_model(
-    lightning_module: LightningModule,
+    model: CancerFoundation,
+    datamodule: pl.LightningDataModule,
     max_epochs: int,
     save_dir: str,
     num_nodes: int = 1,
     gpus: int = 4,
-    wandb_project: str = None,
-    resume_from_checkpoint: str = None,
+    wandb_project: Optional[str] = None,
+    resume_from_checkpoint: Optional[str] = None,
     precision: str = "bf16",
     strategy: str = "auto",    
     gradient_clip_val: float = 1.0,
     accumulate_grad_batches: int = 1,
     check_val_every_n_epoch: int = 1,
-    pretrained_model_path: str = None,
+    pretrained_model_path: Optional[str] = None,
 ):
     """
     Train the model using PyTorch Lightning Trainer
@@ -51,7 +51,7 @@ def train_model(
     
     # Load pretrained weights if provided
     if pretrained_model_path:
-        lightning_module.load_pretrained_weights(pretrained_model_path)
+        model.load_pretrained_weights(pretrained_model_path)
     
     # Setup callbacks
     callbacks = []
@@ -73,7 +73,6 @@ def train_model(
     if wandb_project:
         logger = WandbLogger(
             project=wandb_project,
-            config=lightning_module.args,
         )
     
     # Create trainer
@@ -96,7 +95,8 @@ def train_model(
     
     # Start training
     trainer.fit(
-        lightning_module,
+        model,
+        datamodule=datamodule,
         ckpt_path=resume_from_checkpoint
     )
     
@@ -106,17 +106,33 @@ def train_model(
 
 def main():
     args = get_args()
-    trainer = LightningModule(
-        args=args,
+    
+    
+    datamodule = SingleCellDataModule(
+        data_path=args.train_path,
+        zero_percentages=args.zero_percentages,
+        batch_size=args.batch_size,
+        conditions=args.conditions,
+        balance_primary=args.balance_primary,
+        balance_secondary=args.balance_secondary,
+        max_seq_len=args.max_seq_len,
+        input_style=args.input_style,
+        mask_ratio=args.mask_ratio,
+        TRUNC_BY_SAMPLE=args.trunc_by_sample,
+        training_tasks=args.training_tasks,
+        n_bins=args.n_bins
+    )
+    datamodule.setup(stage="fit")
+    
+    model = CancerFoundation(
         n_bins=args.n_bins,
+        vocab=datamodule.vocab,
         input_emb_style=args.input_emb_style,
         max_seq_len=args.max_seq_len,
         input_style=args.input_style,
         mask_ratio=args.mask_ratio,
         TRUNC_BY_SAMPLE=args.trunc_by_sample,
         training_tasks=args.training_tasks,
-        batch_size=args.batch_size,
-        eval_batch_size=args.eval_batch_size,
         embsize=args.embsize,
         nheads=args.nheads,
         d_hid=args.d_hid,
@@ -138,16 +154,19 @@ def main():
         balance_secondary=args.balance_secondary,
     )
     
+
+    
     train_model(
-    lightning_module=trainer,
-    max_epochs=args.epochs,
-    num_nodes=args.num_nodes,
-    gpus=args.gpus,
-    save_dir=args.save_dir,
-    wandb_project="cancer_foundation",
-    accumulate_grad_batches=args.grad_accu_steps,
-    strategy=args.strategy,
-    precision="bf16-mixed",
+        model=model,
+        datamodule=datamodule,
+        max_epochs=args.epochs,
+        num_nodes=args.num_nodes,
+        gpus=args.gpus,
+        save_dir=args.save_dir,
+        wandb_project="cancer_foundation",
+        accumulate_grad_batches=args.grad_accu_steps,
+        strategy=args.strategy,
+        precision="bf16-mixed",
 )
 
 
