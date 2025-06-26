@@ -28,7 +28,7 @@ def train_model(
     gradient_clip_val: float = 1.0,
     accumulate_grad_batches: int = 1,
     check_val_every_n_epoch: int = 1,
-    pretrained_model_path: Optional[str] = None,
+    val_check_interval: float = 1.,
 ):
     """
     Train the model using PyTorch Lightning Trainer
@@ -49,9 +49,6 @@ def train_model(
         pretrained_model_path: Path to pretrained model weights
     """
     
-    # Load pretrained weights if provided
-    if pretrained_model_path:
-        model.load_pretrained_weights(pretrained_model_path)
     
     # Setup callbacks
     callbacks = []
@@ -86,6 +83,7 @@ def train_model(
         accumulate_grad_batches=accumulate_grad_batches,
         gradient_clip_val=gradient_clip_val,
         check_val_every_n_epoch=check_val_every_n_epoch,
+        val_check_interval=val_check_interval,
         callbacks=callbacks,
         logger=logger,
         log_every_n_steps=50,
@@ -146,6 +144,7 @@ def main():
         loss_type=args.loss,
         do_dat=args.do_dat,
         conditions = args.conditions,
+        conditions_nums = datamodule.conditions_nums if args.conditions else None,
         mvc_decoder_style=args.mvc_decoder_style,
         scale_zero_expression=args.scale_zero_expression,
         data_path=args.train_path,
@@ -154,8 +153,15 @@ def main():
         balance_secondary=args.balance_secondary,
     )
     
-
-    
+    if args.pretrained:
+        print(f"Loading pretrained weights from {args.pretrained}.")
+        vocab_pretrained = json.load(open( args.pretrained / "vocab.json", "r"))
+        gene_mapping = {}
+        for key, value in datamodule.vocab.items():
+            if key in vocab_pretrained:
+                gene_mapping[value] = vocab_pretrained[key]
+        model.load_pretrained_weights(args.pretrained / "best_model.pt", gene_mapping=gene_mapping)
+   
     train_model(
         model=model,
         datamodule=datamodule,
@@ -163,6 +169,7 @@ def main():
         num_nodes=args.num_nodes,
         gpus=args.gpus,
         save_dir=args.save_dir,
+        val_check_interval=args.val_check_interval,
         wandb_project="cancer_foundation",
         accumulate_grad_batches=args.grad_accu_steps,
         strategy=args.strategy,

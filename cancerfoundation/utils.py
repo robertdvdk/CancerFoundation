@@ -3,9 +3,38 @@ from typing import List, Mapping, Optional
 import torch
 import re
 
+
+def map_pretrained_keys_to_new_format(pretrained_key):
+    """
+    Maps keys from pretrained model format to new model format.
+    
+    Args:
+        pretrained_key (str): Key from pretrained model
+        
+    Returns:
+        str: Corresponding key in new model format
+    """
+    # Handle self_attn Wqkv -> in_proj mapping
+    if '.self_attn.Wqkv.weight' in pretrained_key:
+        return pretrained_key.replace('.self_attn.Wqkv.weight', '.self_attn.self_attn.in_proj_weight')
+    elif '.self_attn.Wqkv.bias' in pretrained_key:
+        return pretrained_key.replace('.self_attn.Wqkv.bias', '.self_attn.self_attn.in_proj_bias')
+    
+    # Handle self_attn out_proj mapping (add extra self_attn layer)
+    elif '.self_attn.out_proj.weight' in pretrained_key:
+        return pretrained_key.replace('.self_attn.out_proj.weight', '.self_attn.self_attn.out_proj.weight')
+    elif '.self_attn.out_proj.bias' in pretrained_key:
+        return pretrained_key.replace('.self_attn.out_proj.bias', '.self_attn.self_attn.out_proj.bias')
+    
+    # For all other keys (linear1, linear2, norm1, norm2), return unchanged
+    else:
+        return pretrained_key
+
+
 def load_pretrained(
     model: torch.nn.Module,
     pretrained_params: Mapping[str, torch.Tensor],
+    gene_mapping: Optional[dict] = None, 
     verbose: bool = True,
 ) -> torch.nn.Module:
     """
@@ -28,8 +57,18 @@ def load_pretrained(
     not_identical = []
     updated = []
     for key in pretrained_params.keys():
-        if key in model_new_params.keys() and model_new_params[key].shape == pretrained_params[key].shape:
-            model_new_params[key] = pretrained_params[key]
+        
+        if key =='encoder.embedding.weight' and gene_mapping:
+            model_new_params[key][list(gene_mapping.keys())] = pretrained_params[key][list(gene_mapping.values())]
+            if verbose:
+                print(f"Updated {model_new_params[key].shape} dimensional gene embedding with {len(gene_mapping)} genes from pretrained weights.")
+            
+            continue
+        
+        
+        model_key = map_pretrained_keys_to_new_format(key)
+        if model_key in model_new_params.keys() and model_new_params[model_key].shape == pretrained_params[key].shape:
+            model_new_params[model_key] = pretrained_params[key]
             updated.append(key)
         else:
             if key in model_new_params.keys():
@@ -61,6 +100,8 @@ def load_pretrained(
     
     if verbose and len(not_identical) > 0:
         print("Couldn't load following keys: ", not_identical)
-
+    if verbose:
+        print(f"Updated: {updated}")
+    
     model.load_state_dict(model_new_params)
     return model

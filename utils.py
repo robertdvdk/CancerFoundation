@@ -20,10 +20,10 @@ def get_args():
         help="The directory to load the checkpoint.",
     )
     parser.add_argument(
-        "--pretrained-model-path",
-        type=str,
+        "--pretrained",
+        type=Path,
         default=None,
-        help="Path to the pretrained model. Use for finetuning."
+        help="Path to the pretrained model weights."
     )
 
     # settings for data
@@ -119,12 +119,6 @@ def get_args():
         help="The batch size for training. Default is 32.",
     )
     parser.add_argument(
-        "--eval-batch-size",
-        type=int,
-        default=32,
-        help="The batch size for evaluation. Default is 32.",
-    )
-    parser.add_argument(
         "--epochs",
         type=int,
         default=15,
@@ -195,13 +189,6 @@ def get_args():
         default=0.2,
         help="The dropout rate. Default is 0.2.",
     )
-    # settings for logging
-    parser.add_argument(
-        "--log-interval",
-        type=int,
-        default=100,
-        help="The interval for logging. Default is 100.",
-    )
     parser.add_argument(
         "--wandb",
         type=str,
@@ -268,5 +255,9 @@ def get_args():
         default=None,
         help="Number of epochs to train for in this run.",
     )
-
+    parser.add_argument(
+        "--val-check-interval",
+        type=float,
+        default=1.,
+    )
     return parser.parse_args()

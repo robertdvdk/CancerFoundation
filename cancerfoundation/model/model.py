@@ -1,6 +1,7 @@
+from pathlib import Path
 import pytorch_lightning as pl
 import os
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 import transformers
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, random_split
 from torch import nn
@@ -38,6 +39,7 @@ class CancerFoundation(pl.LightningModule):
         data_path: Union[str, os.PathLike],
         loss_type: LossType = LossType.MSE,
         conditions: Optional[List[str]] = None,
+        conditions_nums: Optional[Any] = None,
         mvc_decoder_style: str = "inner product",
         scale_zero_expression: Optional[float] = None,
         do_dat: bool = False,
@@ -84,7 +86,7 @@ class CancerFoundation(pl.LightningModule):
         self.explicit_zero_prob = explicit_zero_prob
         self.do_dat = do_dat
         self.conditions = conditions
-        self.conditions_nums = None
+        self.conditions_nums = conditions_nums
         
         # Balance sampling parameters
         if balance_primary is None and balance_secondary is not None:
@@ -208,19 +210,17 @@ class CancerFoundation(pl.LightningModule):
                 },
             }
 
-   
-
-    def load_pretrained_weights(self, pretrained_model_path: str, verbose: bool = True):
+    def load_pretrained_weights(self, pretrained_model_path: Path, gene_mapping: Optional[dict], verbose: bool = True):
         """Load pretrained weights"""
-        if pretrained_model_path.endswith(".safetensors"):
+        if pretrained_model_path.name.endswith(".safetensors"):
             tensors = {}
             with safe_open(pretrained_model_path, framework="pt", device="cpu") as f:
                 for k in f.keys():
                     tensors[k] = f.get_tensor(k)
-        elif pretrained_model_path.endswith(".pth") or pretrained_model_path.endswith(".pt"):
+        elif pretrained_model_path.name.endswith(".pth") or pretrained_model_path.name.endswith(".pt"):
             tensors = torch.load(pretrained_model_path, map_location="cpu")
         else:
             raise ValueError("Unsupported file format. Use .safetensors, .pth, or .pt")
         
-        return load_pretrained(self.model, tensors, verbose=verbose)
+        return load_pretrained(self.model, tensors, gene_mapping, verbose=verbose)
 

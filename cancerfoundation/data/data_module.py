@@ -71,7 +71,7 @@ class SingleCellDataModule(pl.LightningDataModule):
                 self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
         
         # Create train/validation split
-        self.train_dataset, self.val_dataset = random_split(self.dataset, [0.95, 0.05])
+        self.train_dataset, self.val_dataset = random_split(self.dataset, [1-0.003, 0.003])
         self.vocab = self.dataset.vocab
         
         self.pad_token_id = self.vocab["<pad>"]
