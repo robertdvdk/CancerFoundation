@@ -21,4 +21,5 @@ srun --environment=bionemo python pretrain.py \
     --train-path training_data/pretraining_data/pretraining_cells \
     --pretrained weights/scgpt \
     --wandb debug \
-    --zero-percentages 0.2 0.4 0.6
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp_find_unused_parameters_true'
