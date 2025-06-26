@@ -12,7 +12,7 @@ srun --environment=bionemo python pretrain.py \
     --d-hi 512 \
     --epochs 3 \
     --lr 0.0001 \
-    --warmup-ratio-or-step 10000 \
+    --warmup-ratio-or-step 5000 \
     --val-check-interval 0.25 \
     --trunc-by-sample \
     --loss mse \
