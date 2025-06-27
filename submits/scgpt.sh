@@ -1,11 +1,14 @@
 #!/bin/bash -l
-#SBATCH --job-name=cf-pretrain
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --exclusive
 
 srun --environment=bionemo python pretrain.py \
     --gpus 4 \
     --save-dir ./save/scgpt-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 64 \
     --nlayers 12 \
     --nheads 8 \
     --embsize 512 \
