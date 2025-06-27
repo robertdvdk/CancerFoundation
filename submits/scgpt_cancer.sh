@@ -1,5 +1,8 @@
 #!/bin/bash -l
-#SBATCH --job-name=cf-pretrain
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --exclusive
 
 srun --environment=bionemo python pretrain.py \
     --gpus 4 \
@@ -10,7 +13,7 @@ srun --environment=bionemo python pretrain.py \
     --nheads 8 \
     --embsize 512 \
     --d-hi 512 \
-    --epochs 3 \
+    --epochs 4 \
     --lr 0.0001 \
     --warmup-ratio-or-step 5000 \
     --val-check-interval 0.25 \
@@ -20,6 +23,7 @@ srun --environment=bionemo python pretrain.py \
     --balance-secondary technology \
     --train-path training_data/pretraining_data/pretraining_cells \
     --pretrained weights/scgpt_cancer \
-    --wandb debug \
+    --wandb scgpt \
+    --wandb-entity cancerfoundation \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp_find_unused_parameters_true'

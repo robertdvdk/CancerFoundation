@@ -5,8 +5,7 @@ import os
 from typing import Optional
 
 sys.path.insert(0, "../")
-from utils import get_args
-from cancerfoundation.loss import LossType
+from utils import get_args, MyProgressBar
 from cancerfoundation.model.model import CancerFoundation
 from cancerfoundation.data.data_module import SingleCellDataModule
 import pytorch_lightning as pl
@@ -22,6 +21,7 @@ def train_model(
     num_nodes: int = 1,
     gpus: int = 4,
     wandb_project: Optional[str] = None,
+    wandb_entitiy: Optional[str] = None,
     resume_from_checkpoint: Optional[str] = None,
     precision: str = "bf16",
     strategy: str = "auto",    
@@ -52,7 +52,7 @@ def train_model(
     
     # Setup callbacks
     callbacks = []
-    
+    callbacks.append(MyProgressBar(refresh_rate=5))
     # Model checkpointing
     checkpoint_callback = ModelCheckpoint(
         dirpath=save_dir,
@@ -69,6 +69,7 @@ def train_model(
     logger = None
     if wandb_project:
         logger = WandbLogger(
+            entity=wandb_entitiy,
             project=wandb_project,
         )
     
@@ -170,7 +171,8 @@ def main():
         gpus=args.gpus,
         save_dir=args.save_dir,
         val_check_interval=args.val_check_interval,
-        wandb_project="cancer_foundation",
+        wandb_project=args.wandb,
+        wandb_entitiy=args.wandb_entity,
         accumulate_grad_batches=args.grad_accu_steps,
         strategy=args.strategy,
         precision="bf16-mixed",

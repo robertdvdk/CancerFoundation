@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, "../")
 from cancerfoundation.loss import LossType
 from pathlib import Path
+from pytorch_lightning.callbacks import TQDMProgressBar
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -196,6 +197,11 @@ def get_args():
         help="The project name for wandb. If set to None, no logging will occur.",
     )
     parser.add_argument(
+        "--wandb-entity",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--conditions",
         nargs='+',
         default=None,
@@ -261,3 +267,23 @@ def get_args():
         default=1.,
     )
     return parser.parse_args()
+
+
+class MyProgressBar(TQDMProgressBar):
+    def init_validation_tqdm(self):
+        bar = super().init_validation_tqdm()
+        if not sys.stdout.isatty():
+            bar.disable = True
+        return bar
+
+    def init_predict_tqdm(self):
+        bar = super().init_predict_tqdm()
+        if not sys.stdout.isatty():
+            bar.disable = True
+        return bar
+
+    def init_test_tqdm(self):
+        bar = super().init_test_tqdm()
+        if not sys.stdout.isatty():
+            bar.disable = True
+        return bar

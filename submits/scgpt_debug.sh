@@ -13,7 +13,7 @@ srun --environment=bionemo python pretrain.py \
     --nheads 8 \
     --embsize 512 \
     --d-hi 512 \
-    --epochs 3 \
+    --epochs 4 \
     --lr 0.0001 \
     --warmup-ratio-or-step 5000 \
     --val-check-interval 0.25 \
@@ -24,5 +24,6 @@ srun --environment=bionemo python pretrain.py \
     --train-path training_data/pretraining_data/debug_data/ \
     --pretrained weights/scgpt \
     --wandb debug \
+    --wandb-entity cancerfoundation \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp_find_unused_parameters_true'
