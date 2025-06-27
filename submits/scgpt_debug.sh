@@ -1,8 +1,8 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
-#SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:4
+#SBATCH --exclusive
 
 srun --environment=bionemo python pretrain.py \
     --gpus 4 \
