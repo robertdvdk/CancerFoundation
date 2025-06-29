@@ -8,15 +8,15 @@ srun --environment=bionemo python pretrain.py \
     --gpus 4 \
     --save-dir ./save/scgpt_cancer-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 64 \
     --nlayers 12 \
     --nheads 8 \
     --embsize 512 \
     --d-hi 512 \
-    --epochs 4 \
+    --epochs 3 \
     --lr 0.0001 \
     --warmup-ratio-or-step 5000 \
-    --val-check-interval 0.25 \
+    --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
     --balance-primary tissue \
