@@ -23,7 +23,6 @@ srun --environment=bionemo python pretrain.py \
     --balance-primary tissue \
     --balance-secondary technology \
     --train-path training_data/pretraining_data/pretraining_cells \
-    --pretrained weights/scgpt_cancer \
     --wandb scgpt \
     --wandb-entity cancerfoundation \
     --zero-percentages 0.2 0.4 0.6 \
