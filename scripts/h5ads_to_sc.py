@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, "./")
 
-from cancerfoundation.dataset import DatasetDir
+from cancerfoundation.data.dataset import DatasetDir
 from argparse import ArgumentParser
 from bionemo.scdl.io.single_cell_collection import SingleCellCollection
 
@@ -20,7 +20,7 @@ def get_args():
     parser = ArgumentParser()
     parser.add_argument("--h5ad-path", type=Path)
     parser.add_argument("--data-path", type=Path)
-    
+    parser.add_argument("--vocab-path", type=Path, required=False)
     return parser.parse_args()
 
 
@@ -38,13 +38,16 @@ def _save_vocab_to_dir(vocab: dict[str, int], data_dir: DatasetDir) -> None:
     with open(data_dir.vocab_path , "w") as f:
         json.dump(vocab, f)
         
-def _add_gene_id_to_h5ads(h5ads: Path, vocab: dict[str, int]) -> None:
+def _add_gene_id_to_h5ads(h5ads: Path, vocab: dict[str, int], data_path: Path) -> None:
+    (data_path / "h5ads").mkdir()
     for path in h5ads.iterdir():
         if not path.name.endswith(".h5ad"):
             continue
         adata = sc.read_h5ad(path)
         adata.var[GENE_ID] = adata.var_names.map(vocab)
-        adata.write_h5ad(path)
+        adata = adata[:, ~adata.var[GENE_ID].isna()].copy()
+        adata.var[GENE_ID] = adata.var[GENE_ID].astype(int)
+        adata.write_h5ad(data_path / "h5ads" / path.name)
 
 
 def convert_columns_to_categorical_with_mapping(df):
@@ -67,22 +70,25 @@ def convert_columns_to_categorical_with_mapping(df):
 
 def main():
     
-    args =get_args()
+    args = get_args()
     h5ad_path = args.h5ad_path
-    columns = ['sample', 'disease', 'technology', 'tissue', "suspension", "project_id"]
+    #columns = ['sample', 'disease', 'technology', 'tissue', "suspension", "project_id"]
+    columns = ['sample', 'cancer_type', 'technology', 'tissue']
     
     data_path = DatasetDir(args.data_path)
     data_path.mkdir()
     # Generate and save vocabulary
-    vocab = _generate_vocab_from_h5ads(h5ad_path, CLS_TOKEN, PAD_TOKEN)
+    if args.vocab_path is None:
+        vocab = _generate_vocab_from_h5ads(h5ad_path, CLS_TOKEN, PAD_TOKEN)
+    else:
+        vocab = json.load(args.vocab_path.open())
     _save_vocab_to_dir(vocab, data_path)
-    
     # Add gene IDs to h5ad files
-    _add_gene_id_to_h5ads(h5ad_path, vocab)
+    _add_gene_id_to_h5ads(h5ad_path, vocab, args.data_path)
     
     # Create and process memmap files
     memmaps = SingleCellCollection(data_path.data_dir / "tmp")
-    memmaps.load_h5ad_multi(h5ad_path, max_workers=12)
+    memmaps.load_h5ad_multi(args.data_path / "h5ads", max_workers=12)
     
     # Collect observations
     obs_list = []

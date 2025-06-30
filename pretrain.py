@@ -122,37 +122,39 @@ def main():
         n_bins=args.n_bins
     )
     datamodule.setup(stage="fit")
-    
-    model = CancerFoundation(
-        n_bins=args.n_bins,
-        vocab=datamodule.vocab,
-        input_emb_style=args.input_emb_style,
-        max_seq_len=args.max_seq_len,
-        input_style=args.input_style,
-        mask_ratio=args.mask_ratio,
-        TRUNC_BY_SAMPLE=args.trunc_by_sample,
-        training_tasks=args.training_tasks,
-        embsize=args.embsize,
-        nheads=args.nheads,
-        d_hid=args.d_hid,
-        nlayers=args.nlayers,
-        dropout=args.dropout,
-        lr=args.lr,
-        epochs=args.epochs,
-        warmup_ratio_or_step=args.warmup_ratio_or_step,
-        scheduler_interval=args.scheduler_interval,
-        scheduler_factor=args.scheduler_factor,
-        loss_type=args.loss,
-        do_dat=args.do_dat,
-        conditions = args.conditions,
-        conditions_nums = datamodule.conditions_nums if args.conditions else None,
-        mvc_decoder_style=args.mvc_decoder_style,
-        scale_zero_expression=args.scale_zero_expression,
-        data_path=args.train_path,
-        zero_percentages=args.zero_percentages,
-        balance_primary=args.balance_primary,
-        balance_secondary=args.balance_secondary,
-    )
+    if args.resume_from_checkpoint:
+        model = CancerFoundation.load_from_checkpoint(args.resume_from_checkpoint, vocab=datamodule.vocab)
+    else:
+        model = CancerFoundation(
+            n_bins=args.n_bins,
+            vocab=datamodule.vocab,
+            input_emb_style=args.input_emb_style,
+            max_seq_len=args.max_seq_len,
+            input_style=args.input_style,
+            mask_ratio=args.mask_ratio,
+            TRUNC_BY_SAMPLE=args.trunc_by_sample,
+            training_tasks=args.training_tasks,
+            embsize=args.embsize,
+            nheads=args.nheads,
+            d_hid=args.d_hid,
+            nlayers=args.nlayers,
+            dropout=args.dropout,
+            lr=args.lr,
+            epochs=args.epochs,
+            warmup_ratio_or_step=args.warmup_ratio_or_step,
+            scheduler_interval=args.scheduler_interval,
+            scheduler_factor=args.scheduler_factor,
+            loss_type=args.loss,
+            do_dat=args.do_dat,
+            conditions = args.conditions,
+            conditions_nums = datamodule.conditions_nums if args.conditions else None,
+            mvc_decoder_style=args.mvc_decoder_style,
+            scale_zero_expression=args.scale_zero_expression,
+            data_path=args.train_path,
+            zero_percentages=args.zero_percentages,
+            balance_primary=args.balance_primary,
+            balance_secondary=args.balance_secondary,
+        )
     
     if args.pretrained:
         print(f"Loading pretrained weights from {args.pretrained}.")
@@ -170,6 +172,7 @@ def main():
         num_nodes=args.num_nodes,
         gpus=args.gpus,
         save_dir=args.save_dir,
+        resume_from_checkpoint=args.resume_from_checkpoint,
         val_check_interval=args.val_check_interval,
         wandb_project=args.wandb,
         wandb_entitiy=args.wandb_entity,

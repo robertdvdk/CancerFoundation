@@ -29,7 +29,7 @@ class DatasetDir:
     MAPPING_PATH = "mapping.json"
     OBS_PATH = "obs.parquet"
     
-    def __init__(self, data_dir: str):
+    def __init__(self, data_dir: str | Path):
         self.data_dir = Path(data_dir)
     
     def validate(self):
@@ -68,7 +68,7 @@ class SingleCellDataset(Dataset):
     CLS_TOKEN = "<cls>"
     PAD_TOKEN = "<pad>"
     
-    def __init__(self, data_dir: str, pad_value: float = -1., obs_columns: Optional[list[str]]=None):
+    def __init__(self, data_dir: str | Path, pad_value: float = -1., obs_columns: Optional[list[str]]=None):
         super().__init__()
         self.data_dir = DatasetDir(data_dir)
         self.vocab = self._load_vocab()
