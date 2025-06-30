@@ -7,6 +7,7 @@
 srun --environment=bionemo python pretrain.py \
     --gpus 4 \
     --save-dir ./save/scgpt_cancer-$(date +%b%d-%H-%M-%Y) \
+    --resume-from-checkpoint save/scgpt_cancer-Jun30-10-17-2025/epoch_epoch=01.ckpt \
     --max-seq-len 1200 \
     --batch-size 64 \
     --nlayers 12 \
