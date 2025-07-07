@@ -85,7 +85,7 @@ class SingleCellDataModule(pl.LightningDataModule):
                 dataset, 
                 primary_condition=self.balance_primary, 
                 secondary_condition=self.balance_secondary, 
-                oversample=False
+                oversample=True
             )
         else:
             sampler = RandomSampler(dataset) if train else SequentialSampler(dataset)
