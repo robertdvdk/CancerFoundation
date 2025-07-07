@@ -1,4 +1,3 @@
-cf_oversampling.sh
 #!/bin/bash -l
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
