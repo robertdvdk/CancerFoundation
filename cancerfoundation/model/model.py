@@ -140,7 +140,7 @@ class CancerFoundation(pl.LightningModule):
             do_dat=self.do_dat,
             explicit_zero_prob=self.explicit_zero_prob,
         )
-
+        
     def forward(self, data_dict, use_cell_embedding=None):
         """Forward pass"""
         if use_cell_embedding is None:

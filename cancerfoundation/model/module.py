@@ -22,7 +22,7 @@ def with_sdp_kernel(func):
     return wrapped_func
 
 
-class TransformerModule(pl.LightningModule):
+class TransformerModule(nn.Module):
     def __init__(
         self,
         ntoken: int,
@@ -937,7 +937,7 @@ class MVCDecoder(nn.Module):
             self.W = nn.Linear(d_model, d_in, bias=False)
             if explicit_zero_prob:  # by default, gene-wise prob rate
                 self.W_zero_logit = nn.Linear(d_model, d_in)
-            if out_dim > 0:
+            if out_dim > 1:
                 self.fc1 = nn.Linear(1, out_dim)
         elif arch_style == "concat query":
             self.gene2query = nn.Linear(d_model, 64)
