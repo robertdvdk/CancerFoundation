@@ -90,6 +90,7 @@ def train_model(
         log_every_n_steps=5,
         enable_progress_bar=True,
         enable_model_summary=True,
+        limit_train_batches=10, limit_val_batches=5
     )
     
     # Start training
