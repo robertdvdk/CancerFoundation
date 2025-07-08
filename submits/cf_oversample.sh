@@ -25,4 +25,4 @@ srun --environment=bionemo python pretrain.py \
     --wandb cancer_gpt \
     --wandb-entity cancerfoundation \
     --zero-percentages 0.2 0.4 0.6 \
-    --strategy='ddp_find_unused_parameters_true'
+    --strategy='ddp'
