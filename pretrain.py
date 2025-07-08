@@ -87,7 +87,7 @@ def train_model(
         val_check_interval=val_check_interval,
         callbacks=callbacks,
         logger=logger,
-        log_every_n_steps=50,
+        log_every_n_steps=5,
         enable_progress_bar=True,
         enable_model_summary=True,
     )

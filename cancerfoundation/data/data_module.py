@@ -108,7 +108,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         )
 
         batch_size = self.batch_size if train else self.batch_size
-        num_workers = min(len(os.sched_getaffinity(0)), self.batch_size)
+        num_workers = max(16, min(len(os.sched_getaffinity(0)), self.batch_size))
         print(f"Using {num_workers} workers.")
         return DataLoader(
             dataset,
