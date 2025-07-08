@@ -526,23 +526,22 @@ class TransformerModule(pl.LightningModule):
                     
                 
             
-        if use_cell_embedding:
-            previous_cell_embs = output_dict["cell_emb"].detach().clone()
-            preds = self.generative_forward(
-                pcpt_gene.clone(),
-                pcpt_expr.clone(),
-                pcpt_key_padding_mask.clone(),
-                gen_gene.clone(),
-                gen_key_padding_mask.clone(),
-                MVC=False,
-                input_cell_emb=previous_cell_embs,
-                conditions=conditions_batch
-            )["gen_preds"]
+        previous_cell_embs = output_dict["cell_emb"].detach()
+        preds = self.generative_forward(
+            pcpt_gene,
+            pcpt_expr,
+            pcpt_key_padding_mask,
+            gen_gene,
+            gen_key_padding_mask,
+            MVC=False,
+            input_cell_emb=previous_cell_embs,
+            conditions=conditions_batch
+        )["gen_preds"]
 
-            loss_gen = self.criterion(
-                preds, gen_expr_target, positions_to_match)
-            loss = loss + loss_gen
-            loss_dict["loss_gen"] = loss_gen
+        loss_gen = self.criterion(
+            preds, gen_expr_target, positions_to_match)
+        loss = loss + use_cell_embedding * loss_gen
+        loss_dict["loss_gen"] = loss_gen
           
         loss_dict["total_loss"] = loss       
         return loss_dict
