@@ -3,15 +3,61 @@ from collections import defaultdict
 from pathlib import Path
 import os
 from typing import Dict, List, Optional, Union, Dict
+from typing import Iterator, Optional
+from operator import itemgetter
 from .data_sampler import get_balanced_sampler
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, random_split
 
 from .data_collator import AnnDataCollator
 from .dataset import SingleCellDataset
-
+from torch.utils.data import (
+    Dataset,
+    Sampler,
+    DistributedSampler,
+    WeightedRandomSampler
+)
 import numpy as np
 
 
+
+class DatasetFromSampler(Dataset):
+
+    def __init__(self, sampler: Sampler):
+        self.sampler = sampler
+        self.sampler_list = None
+
+    def __getitem__(self, index: int):
+        if self.sampler_list is None:
+            self.sampler_list = list(self.sampler)
+        return self.sampler_list[index]
+
+    def __len__(self) -> int:
+        return len(self.sampler)
+
+
+class DistributedSamplerWrapper(DistributedSampler):
+    """ Convert any Pytorch Sampler to a DistributedSampler """
+
+    def __init__(
+        self,
+        sampler,
+        num_replicas: Optional[int] = None,
+        rank: Optional[int] = None,
+        shuffle: bool = True,
+    ):
+        super(DistributedSamplerWrapper, self).__init__(
+            DatasetFromSampler(sampler),
+            num_replicas=num_replicas,
+            rank=rank,
+            shuffle=shuffle,
+        )
+        self.sampler = sampler
+
+    def __iter__(self) -> Iterator[int]:
+        self.dataset = DatasetFromSampler(self.sampler)
+        indexes_of_indexes = super().__iter__()
+        subsampler_indexes = self.dataset
+        return iter(itemgetter(*indexes_of_indexes)(subsampler_indexes))
 
 
 class SingleCellDataModule(pl.LightningDataModule):
@@ -90,6 +136,16 @@ class SingleCellDataModule(pl.LightningDataModule):
         else:
             sampler = RandomSampler(dataset) if train else SequentialSampler(dataset)
 
+        
+        if self.trainer.world_size > 1:
+            sampler = DistributedSamplerWrapper(
+                dataset,
+                sampler,
+                num_replicas=self.trainer.world_size,
+                rank=self.trainer.global_rank,
+                shuffle=True,
+                drop_last=True)
+        
         # Setup collator
         collator = AnnDataCollator(
             do_padding=self.max_seq_len is not None,

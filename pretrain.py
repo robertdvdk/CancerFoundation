@@ -83,12 +83,13 @@ def train_model(
         precision=precision,
         accumulate_grad_batches=accumulate_grad_batches,
         gradient_clip_val=gradient_clip_val,
-        check_val_every_n_epoch=check_val_every_n_epoch,
+        val_check_interval=val_check_interval,
         callbacks=callbacks,
         logger=logger,
         log_every_n_steps=5,
         enable_progress_bar=True,
         enable_model_summary=True,
+        use_distributed_sampler=True
     )
     
     # Start training
