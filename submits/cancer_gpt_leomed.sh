@@ -21,6 +21,5 @@ singularity run --pwd /cluster/work/boeva/fbarkmann/CancerFoundation --bind /clu
     --balance-secondary technology \
     --train-path training_data/pretraining_data/cancer_gpt \
     --wandb cancer_gpt \
-    --wandb-entity cancerfoundation \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp_find_unused_parameters_true'
