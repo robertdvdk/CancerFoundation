@@ -150,6 +150,14 @@ class CancerFoundation(pl.LightningModule):
     def on_train_epoch_end(self):
         """Debug training epoch end"""
         print(f"Rank {self.global_rank}: Training epoch {self.current_epoch} ended")
+        
+    def on_train_step_end(self):
+        """Debug training epoch end"""
+        print(f"Rank {self.global_rank}: Training step {self.current_step} ended")
+
+    def on_train_epoch_start(self):
+        """Debug training epoch end"""
+        print(f"Rank {self.global_rank}: Training epoch {self.current_epoch} started")
 
     def on_validation_start(self):
         """Debug validation start"""
