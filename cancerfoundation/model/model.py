@@ -148,13 +148,31 @@ class CancerFoundation(pl.LightningModule):
         return self.model(data_dict, use_cell_embedding=use_cell_embedding)
     
     
+
+    def on_train_epoch_end(self):
+        """Debug training epoch end"""
+        print(f"Rank {self.global_rank}: Training epoch {self.current_epoch} ended")
+
     def on_validation_start(self):
-        """Add debugging for validation start"""
+        """Debug validation start"""
+        print(f"Rank {self.global_rank}: Entering on_validation_start")
+        
+        # Add explicit barrier
+        if hasattr(self.trainer.strategy, 'barrier'):
+            print(f"Rank {self.global_rank}: About to call barrier in validation_start")
+            self.trainer.strategy.barrier()
+            print(f"Rank {self.global_rank}: Barrier completed in validation_start")
+        
         print(f"Rank {self.global_rank}: Starting validation epoch")
 
-    def on_validation_end(self):
-        """Add debugging for validation end"""
-        print(f"Rank {self.global_rank}: Ending validation epoch")
+    def on_validation_epoch_start(self):
+        """Debug validation epoch start"""
+        print(f"Rank {self.global_rank}: on_validation_epoch_start called")
+
+
+    def on_validation_epoch_end(self):
+        """Debug validation epoch end"""
+        print(f"Rank {self.global_rank}: on_validation_epoch_end called")
 
     def training_step(self, batch, batch_idx):
         """Training step"""
