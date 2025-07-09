@@ -143,8 +143,7 @@ class SingleCellDataModule(pl.LightningDataModule):
                 sampler,
                 num_replicas=self.trainer.world_size,
                 rank=self.trainer.global_rank,
-                shuffle=True,
-                drop_last=True)
+                shuffle=train)
         
         # Setup collator
         collator = AnnDataCollator(
