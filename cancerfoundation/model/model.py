@@ -162,7 +162,11 @@ class CancerFoundation(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         """Validation step"""
-        loss_dict = self.forward(batch, use_cell_embedding=self.use_cell_embedding)
+        
+        if batch_idx == 0:
+            print(f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders[0])} batches")
+        
+        loss_dict = self.forward(batch, use_cell_embedding=True)
         
         # Log validation metrics
         for key, value in loss_dict.items():
