@@ -173,7 +173,7 @@ class SingleCellDataModule(pl.LightningDataModule):
             batch_size=batch_size,
             sampler=sampler,
             collate_fn=collator,
-            drop_last=train,
+            drop_last=True,
             num_workers=num_workers,
             pin_memory=True,
         )

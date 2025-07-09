@@ -164,7 +164,7 @@ class CancerFoundation(pl.LightningModule):
         """Validation step"""
         
         if batch_idx == 0:
-            print(f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders[0])} batches")
+            print(f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders)} batches")
         
         loss_dict = self.forward(batch, use_cell_embedding=True)
         
