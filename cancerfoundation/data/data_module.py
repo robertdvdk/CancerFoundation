@@ -138,6 +138,7 @@ class SingleCellDataModule(pl.LightningDataModule):
 
         
         if self.trainer.world_size > 1:
+            print(f"Rank: {self.trainer.global_rank} init DistributedSampler.")
             sampler = DistributedSamplerWrapper(
                 dataset,
                 sampler,
