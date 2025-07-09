@@ -146,6 +146,15 @@ class CancerFoundation(pl.LightningModule):
         if use_cell_embedding is None:
             use_cell_embedding = self.use_cell_embedding
         return self.model(data_dict, use_cell_embedding=use_cell_embedding)
+    
+    
+    def on_validation_start(self):
+        """Add debugging for validation start"""
+        print(f"Rank {self.global_rank}: Starting validation epoch")
+
+    def on_validation_end(self):
+        """Add debugging for validation end"""
+        print(f"Rank {self.global_rank}: Ending validation epoch")
 
     def training_step(self, batch, batch_idx):
         """Training step"""

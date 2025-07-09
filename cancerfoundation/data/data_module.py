@@ -71,7 +71,7 @@ class SingleCellDataModule(pl.LightningDataModule):
                 self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
         
         # Create train/validation split
-        self.train_dataset, self.val_dataset = random_split(self.dataset, [1-0.003, 0.003])
+        self.train_dataset, self.val_dataset = random_split(self.dataset, [1-0.05, 0.05])
         self.vocab = self.dataset.vocab
         
         self.pad_token_id = self.vocab["<pad>"]
@@ -108,7 +108,10 @@ class SingleCellDataModule(pl.LightningDataModule):
         )
 
         batch_size = self.batch_size if train else self.batch_size
-        num_workers = max(16, min(len(os.sched_getaffinity(0)), self.batch_size))
+        if train:
+            num_workers = max(4, min(len(os.sched_getaffinity(0)), self.batch_size))
+        else: 
+            num_workers = 0
         print(f"Using {num_workers} workers.")
         return DataLoader(
             dataset,
