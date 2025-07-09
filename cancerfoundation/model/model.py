@@ -182,6 +182,7 @@ class CancerFoundation(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Training step"""
         # Update use_cell_embedding based on global step
+        print(f"Rank: {self.global_rank} Working on {batch_idx} batch.")
         self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_step > 1000
         
         loss_dict = self.forward(batch, use_cell_embedding=self.use_cell_embedding)
