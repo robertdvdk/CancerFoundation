@@ -147,8 +147,6 @@ class CancerFoundation(pl.LightningModule):
             use_cell_embedding = self.use_cell_embedding
         return self.model(data_dict, use_cell_embedding=use_cell_embedding)
     
-    
-
     def on_train_epoch_end(self):
         """Debug training epoch end"""
         print(f"Rank {self.global_rank}: Training epoch {self.current_epoch} ended")
@@ -168,7 +166,6 @@ class CancerFoundation(pl.LightningModule):
     def on_validation_epoch_start(self):
         """Debug validation epoch start"""
         print(f"Rank {self.global_rank}: on_validation_epoch_start called")
-
 
     def on_validation_epoch_end(self):
         """Debug validation epoch end"""
