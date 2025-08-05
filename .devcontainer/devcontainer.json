@@ -15,8 +15,12 @@
 	"--env-file",
 	".devcontainer/devcontainer.env" // use this to set environment variables such as WANDB_API_KEY
 	],
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
+
+	// 👇 ADD THIS ENTIRE "mounts" SECTION
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind"
+    ],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
