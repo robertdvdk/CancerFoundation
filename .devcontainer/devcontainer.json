@@ -13,8 +13,8 @@
     "--gpus",
     "all",
 	"--env-file",
-	".devcontainer/devcontainer.env"
-],
+	".devcontainer/devcontainer.env" // use this to set environment variables such as WANDB_API_KEY
+	],
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
@@ -22,7 +22,9 @@
 	// "forwardPorts": [],
 
 	// Uncomment the next line to run commands after the container is created.
-	// "postCreateCommand": "cat /etc/os-release",
+	// Allow for tmux usage in the container, to run long training runs
+	"postCreateCommand": "apt-get update && apt-get install -y tmux",
+
 
 	// Configure tool-specific properties.
 	"customizations": {

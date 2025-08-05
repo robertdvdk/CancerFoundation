@@ -1,7 +1,5 @@
 import json
-import sys 
-from accelerate import Accelerator
-import os
+import sys
 from typing import Optional
 
 sys.path.insert(0, "../")
@@ -12,6 +10,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+
 
 def train_model(
     model: CancerFoundation,
@@ -24,15 +23,15 @@ def train_model(
     wandb_entitiy: Optional[str] = None,
     resume_from_checkpoint: Optional[str] = None,
     precision: str = "bf16",
-    strategy: str = "auto",    
+    strategy: str = "auto",
     gradient_clip_val: float = 1.0,
     accumulate_grad_batches: int = 1,
     check_val_every_n_epoch: int = 1,
-    val_check_interval: float = 1.,
+    val_check_interval: float = 1.0,
 ):
     """
     Train the model using PyTorch Lightning Trainer
-    
+
     Args:
         lightning_module: The LightningModule to train
         max_epochs: Maximum number of epochs
@@ -48,23 +47,20 @@ def train_model(
         check_val_every_n_epoch: Validation frequency
         pretrained_model_path: Path to pretrained model weights
     """
-    
-    
+
     # Setup callbacks
     callbacks = []
     callbacks.append(MyProgressBar(refresh_rate=5))
     # Model checkpointing
     checkpoint_callback = ModelCheckpoint(
-        dirpath=save_dir,
-        filename='epoch_{epoch:02d}',
-        every_n_epochs=1
+        dirpath=save_dir, filename="epoch_{epoch:02d}", every_n_epochs=1
     )
     callbacks.append(checkpoint_callback)
-    
+
     # Learning rate monitoring
-    lr_monitor = LearningRateMonitor(logging_interval='step')
+    lr_monitor = LearningRateMonitor(logging_interval="step")
     callbacks.append(lr_monitor)
-    
+
     # Setup logger
     logger = None
     if wandb_project:
@@ -72,7 +68,7 @@ def train_model(
             entity=wandb_entitiy,
             project=wandb_project,
         )
-    
+
     # Create trainer
     trainer = pl.Trainer(
         max_epochs=max_epochs,
@@ -89,24 +85,20 @@ def train_model(
         log_every_n_steps=5,
         enable_progress_bar=True,
         enable_model_summary=True,
-        use_distributed_sampler=False
+        use_distributed_sampler=False,
     )
-    
-    # Start training
-    trainer.fit(
-        model,
-        datamodule=datamodule,
-        ckpt_path=resume_from_checkpoint
-    )
-    
-    return trainer
 
+    # Start training
+    trainer.fit(model, datamodule=datamodule, ckpt_path=resume_from_checkpoint)
+
+    return trainer
 
 
 def main():
     args = get_args()
-    
-    
+    if args.seed is not None:
+        pl.seed_everything(args.seed, workers=True)
+
     datamodule = SingleCellDataModule(
         data_path=args.train_path,
         zero_percentages=args.zero_percentages,
@@ -119,11 +111,13 @@ def main():
         mask_ratio=args.mask_ratio,
         TRUNC_BY_SAMPLE=args.trunc_by_sample,
         training_tasks=args.training_tasks,
-        n_bins=args.n_bins
+        n_bins=args.n_bins,
     )
     datamodule.setup(stage="fit")
     if args.resume_from_checkpoint:
-        model = CancerFoundation.load_from_checkpoint(args.resume_from_checkpoint, vocab=datamodule.vocab)
+        model = CancerFoundation.load_from_checkpoint(
+            args.resume_from_checkpoint, vocab=datamodule.vocab
+        )
     else:
         model = CancerFoundation(
             n_bins=args.n_bins,
@@ -146,25 +140,28 @@ def main():
             scheduler_factor=args.scheduler_factor,
             loss_type=args.loss,
             do_dat=args.do_dat,
-            conditions = args.conditions,
-            conditions_nums = datamodule.conditions_nums if args.conditions else None,
+            conditions=args.conditions,
+            conditions_nums=datamodule.conditions_nums if args.conditions else None,
             mvc_decoder_style=args.mvc_decoder_style,
             scale_zero_expression=args.scale_zero_expression,
             data_path=args.train_path,
             zero_percentages=args.zero_percentages,
             balance_primary=args.balance_primary,
             balance_secondary=args.balance_secondary,
+            compile=args.compile,
         )
-    
+
     if args.pretrained:
         print(f"Loading pretrained weights from {args.pretrained}.")
-        vocab_pretrained = json.load(open( args.pretrained / "vocab.json", "r"))
+        vocab_pretrained = json.load(open(args.pretrained / "vocab.json", "r"))
         gene_mapping = {}
         for key, value in datamodule.vocab.items():
             if key in vocab_pretrained:
                 gene_mapping[value] = vocab_pretrained[key]
-        model.load_pretrained_weights(args.pretrained / "best_model.pt", gene_mapping=gene_mapping)
-   
+        model.load_pretrained_weights(
+            args.pretrained / "best_model.pt", gene_mapping=gene_mapping
+        )
+
     train_model(
         model=model,
         datamodule=datamodule,
@@ -179,8 +176,7 @@ def main():
         accumulate_grad_batches=args.grad_accu_steps,
         strategy=args.strategy,
         precision="bf16-mixed",
-)
-
+    )
 
 
 if __name__ == "__main__":

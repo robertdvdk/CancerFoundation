@@ -1,18 +1,14 @@
 from pathlib import Path
 import pytorch_lightning as pl
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional, Union
 import transformers
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, random_split
-from torch import nn
 import torch
 from cancerfoundation.utils import load_pretrained
 from cancerfoundation.model.module import TransformerModule
 from cancerfoundation.loss import get_loss
-import numpy as np
 from safetensors import safe_open
 from cancerfoundation.loss import LossType
-
 
 
 class CancerFoundation(pl.LightningModule):
@@ -36,6 +32,7 @@ class CancerFoundation(pl.LightningModule):
         warmup_ratio_or_step: float,
         scheduler_interval: int,
         scheduler_factor: float,
+        compile: bool,
         data_path: Union[str, os.PathLike],
         loss_type: LossType = LossType.MSE,
         conditions: Optional[List[str]] = None,
@@ -73,7 +70,8 @@ class CancerFoundation(pl.LightningModule):
         self.loss_type = loss_type
         self.data_path = data_path
         self.epochs = epochs
-        
+        self.compile = compile
+
         # Training configuration
         self.pad_token = "<pad>"
         self.cls_token = "<cls>"
@@ -87,10 +85,12 @@ class CancerFoundation(pl.LightningModule):
         self.do_dat = do_dat
         self.conditions = conditions
         self.conditions_nums = conditions_nums
-        
+
         # Balance sampling parameters
         if balance_primary is None and balance_secondary is not None:
-            raise ValueError("balance_secondary is not allowed to be set (not None) if balance_primary is None.")
+            raise ValueError(
+                "balance_secondary is not allowed to be set (not None) if balance_primary is None."
+            )
         self.balance_primary = balance_primary
         self.balance_secondary = balance_secondary
         self.zero_percentages = zero_percentages
@@ -105,7 +105,7 @@ class CancerFoundation(pl.LightningModule):
             self.mask_value = -1
             self.pad_value = -2
             self.n_input_bins = self.n_bins
-            
+
         self.pad_token_id = self.vocab["<pad>"]
         self.cls_token_id = self.vocab["<cls>"]
 
@@ -115,9 +115,9 @@ class CancerFoundation(pl.LightningModule):
     def _setup_model(self, mvc_decoder_style: str):
         """Initialize model and loss function"""
         self.criterion = get_loss(
-            loss_type=self.loss_type, 
-            num_classes=self.n_input_bins if self.n_input_bins else None, 
-            scale_zero_expression=self.scale_zero_expression
+            loss_type=self.loss_type,
+            num_classes=self.n_input_bins if self.n_input_bins else None,
+            scale_zero_expression=self.scale_zero_expression,
         )
 
         self.model = TransformerModule(
@@ -140,38 +140,51 @@ class CancerFoundation(pl.LightningModule):
             do_dat=self.do_dat,
             explicit_zero_prob=self.explicit_zero_prob,
         )
-        
+        if self.compile:
+            self.model = torch.compile(self.model)
+
     def forward(self, data_dict, use_cell_embedding=None):
         """Forward pass"""
         if use_cell_embedding is None:
             use_cell_embedding = self.use_cell_embedding
         return self.model(data_dict, use_cell_embedding=use_cell_embedding)
-    
+
     def training_step(self, batch, batch_idx):
         """Training step"""
         # Update use_cell_embedding based on global step
-        self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_step > 1000
-        
+        self.use_cell_embedding = (
+            self.USE_GENERATIVE_TRAINING and self.global_step > 1000
+        )
+
         loss_dict = self.forward(batch, use_cell_embedding=self.use_cell_embedding)
-        
+
         # Log training metrics
         for key, value in loss_dict.items():
             self.log(f"train/{key}", value, on_step=True, on_epoch=False, prog_bar=True)
-        
+
         return loss_dict["total_loss"]
 
     def validation_step(self, batch, batch_idx):
         """Validation step"""
-        
+
         if batch_idx == 0:
-            print(f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders)} batches")
-        
+            print(
+                f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders)} batches"
+            )
+
         loss_dict = self.forward(batch, use_cell_embedding=True)
-        
+
         # Log validation metrics
         for key, value in loss_dict.items():
-            self.log(f"val/{key}", value, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        
+            self.log(
+                f"val/{key}",
+                value,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                sync_dist=True,
+            )
+
         return loss_dict
 
     def configure_optimizers(self):
@@ -193,7 +206,7 @@ class CancerFoundation(pl.LightningModule):
                 num_training_steps=total_num_batches,
                 last_epoch=-1,
             )
-            
+
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
@@ -205,7 +218,7 @@ class CancerFoundation(pl.LightningModule):
             scheduler = torch.optim.lr_scheduler.StepLR(
                 optimizer, self.scheduler_interval, gamma=self.scheduler_factor
             )
-            
+
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
@@ -214,17 +227,23 @@ class CancerFoundation(pl.LightningModule):
                 },
             }
 
-    def load_pretrained_weights(self, pretrained_model_path: Path, gene_mapping: Optional[dict], verbose: bool = True):
+    def load_pretrained_weights(
+        self,
+        pretrained_model_path: Path,
+        gene_mapping: Optional[dict],
+        verbose: bool = True,
+    ):
         """Load pretrained weights"""
         if pretrained_model_path.name.endswith(".safetensors"):
             tensors = {}
             with safe_open(pretrained_model_path, framework="pt", device="cpu") as f:
                 for k in f.keys():
                     tensors[k] = f.get_tensor(k)
-        elif pretrained_model_path.name.endswith(".pth") or pretrained_model_path.name.endswith(".pt"):
+        elif pretrained_model_path.name.endswith(
+            ".pth"
+        ) or pretrained_model_path.name.endswith(".pt"):
             tensors = torch.load(pretrained_model_path, map_location="cpu")
         else:
             raise ValueError("Unsupported file format. Use .safetensors, .pth, or .pt")
-        
-        return load_pretrained(self.model, tensors, gene_mapping, verbose=verbose)
 
+        return load_pretrained(self.model, tensors, gene_mapping, verbose=verbose)

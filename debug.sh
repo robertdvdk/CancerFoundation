@@ -1,0 +1,24 @@
+python pretrain.py \
+    --gpus 1 \
+    --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
+    --max-seq-len 1200 \
+    --batch-size 4 \
+    --nlayers 6 \
+    --nheads 8 \
+    --embsize 256 \
+    --d-hid 512 \
+    --epochs 15 \
+    --lr 0.0001 \
+    --warmup-ratio-or-step 10000 \
+    --trunc-by-sample \
+    --loss "mse" \
+    --train-path "./debug_data" \
+    --zero-percentages 0.2 0.4 0.6 \
+    --conditions "technology" \
+    --balance-primary "tissue" \
+    --balance-secondary "technology" \
+    --wandb "cells" \
+    --strategy='ddp_find_unused_parameters_true' \
+    --grad-accu-steps 16 \
+    --seed 0 \
+    --compile

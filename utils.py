@@ -6,6 +6,7 @@ from cancerfoundation.loss import LossType
 from pathlib import Path
 from pytorch_lightning.callbacks import TQDMProgressBar
 
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -24,7 +25,7 @@ def get_args():
         "--pretrained",
         type=Path,
         default=None,
-        help="Path to the pretrained model weights."
+        help="Path to the pretrained model weights.",
     )
 
     # settings for data
@@ -62,7 +63,7 @@ def get_args():
         "--loss",
         type=LossType,
         default=LossType.MSE,
-        help="The loss function used for the gene expression prediction. Default is ordinal_cross_entropy (Ordinal Cross Entropy)."
+        help="The loss function used for the gene expression prediction. Default is ordinal_cross_entropy (Ordinal Cross Entropy).",
     )
     parser.add_argument(
         "--input-style",
@@ -203,7 +204,7 @@ def get_args():
     )
     parser.add_argument(
         "--conditions",
-        nargs='+',
+        nargs="+",
         default=None,
         help="The conditions (obs keys) the model should be invariant to.",
     )
@@ -211,24 +212,21 @@ def get_args():
         "--scale-zero-expression",
         type=float,
         default=None,
-        help="How much weight should be placed on predicting if gene expression is above 0. If None, equal weighting is used."
+        help="How much weight should be placed on predicting if gene expression is above 0. If None, equal weighting is used.",
     )
     parser.add_argument(
         "--mvc-decoder-style",
         type=str,
         default="inner product",
-        choices=["concat query", "inner product"]
+        choices=["concat query", "inner product"],
     )
     parser.add_argument(
-        "--train-path",
-        type=str,
-        default=None,
-        help="Path to the training data."
+        "--train-path", type=str, default=None, help="Path to the training data."
     )
     parser.add_argument(
         "--do-dat",
         action="store_true",
-        help="Whether or not to do domain adversarial training on the conditions."
+        help="Whether or not to do domain adversarial training on the conditions.",
     )
     parser.add_argument(
         "--vocab",
@@ -250,7 +248,7 @@ def get_args():
     )
     parser.add_argument(
         "--zero-percentages",
-        nargs='+',
+        nargs="+",
         type=float,
         default=None,
         help="The percentage of zero-expressed genes sampled.",
@@ -264,7 +262,20 @@ def get_args():
     parser.add_argument(
         "--val-check-interval",
         type=float,
-        default=1.,
+        default=1.0,
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducibility. If not set, will use a random seed.",
+    )
+
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="Whether to compile the model with torch.compile. Default is False.",
     )
     return parser.parse_args()
 
