@@ -11,9 +11,8 @@ __pycache__/
 
 # VSCode settings
 .vscode/
-training_data/.cache
-training_data/data
-training_data/downloads
+
+*.code-workspace
 
 save
 example
@@ -24,4 +23,8 @@ example
 *.pth
 *.tar
 
-debug_data/
+# Data files
+training_data/.cache
+training_data/data
+training_data/downloads
+drug_response_prediction/data

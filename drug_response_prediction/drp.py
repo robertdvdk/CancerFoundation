@@ -1,6 +1,8 @@
 import argparse
 import random
 import os
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8' # A common configuration
+
 import numpy as np
 import csv
 import pandas as pd
@@ -16,40 +18,10 @@ from torch_geometric.data import Data, DataLoader
 import torch.optim as optim
 import copy
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
-parser = argparse.ArgumentParser(description='Drug response prediction.')
-parser.add_argument('--gpu_id', dest='gpu_id', type=int,
-                    default='0', help='GPU devices. Use -1 for CPU.')
-parser.add_argument('--embedding_path', type=str, default=None,
-                    help='Path to the gene expression embeddings.')
-parser.add_argument('--test_drug', type=str,
-                    default=None, help='Hold-out drug.')
-parser.add_argument('--val_drug', type=str, default=None,
-                    help='Drug used for early stopping.')
-
-args = parser.parse_args()
-
-TCGA_label_set = ["ALL", "BLCA", "BRCA", "CESC", "DLBC", "LIHC", "LUAD",
-                  "ESCA", "GBM", "HNSC", "KIRC", "LAML", "LCML", "LGG",
-                  "LUSC", "MESO", "MM", "NB", "OV", "PAAD", "SCLC", "SKCM",
-                  "STAD", "THCA", 'COAD/READ']
-DPATH = './data'
-Drug_info_file = f"./{DPATH}/drug/metadata.csv"
-# '%s/CCLE/Cell_lines_annotations_20181226.txt' % DPATH
-Cell_line_info_file = f"./{DPATH}/cell_line/metadata.txt"
-# '%s/GDSC/drug_graph_feat' % DPATH
-Drug_feature_file = f"./{DPATH}/drug/graph_feature"
-# '%s/CCLE/GDSC_IC50.csv' % DPATH
-Cancer_response_exp_file = f"./{DPATH}/ground_truth.csv"
-Max_atoms = 100
 
 
-assert (args.test_drug is None and args.val_drug is None) or (
-    args.test_drug != args.val_drug), "test_drug and val_drug must either both be None, or refer to different drugs."
 
-
-def MetadataGenerate(Drug_info_file, Cell_line_info_file, Drug_feature_file, Gene_expression_file, filtered):
+def MetadataGenerate(Drug_info_file, Cell_line_info_file, Drug_feature_file, Gene_expression_file, Cancer_response_exp_file):
     # drug_id --> pubchem_id
     reader = csv.reader(open(Drug_info_file, 'r'))
     rows = [item for item in reader]
@@ -100,7 +72,7 @@ def MetadataGenerate(Drug_info_file, Cell_line_info_file, Drug_feature_file, Gen
     return drug_feature, gexpr_feature, data_idx
 
 
-def DataSplit(data_idx, ratio=0.95):
+def DataSplit(data_idx, TCGA_label_set, ratio=0.95):
     data_train_idx, data_test_idx = [], []
     for each_type in TCGA_label_set:
         data_subtype_idx = [item for item in data_idx if item[-1] == each_type]
@@ -169,18 +141,61 @@ def place_on_device(gpu_id=0, *tensors_or_models):
     # Move each tensor or model to the specified device and return them as a list
     return [tensor_or_model.to(device) for tensor_or_model in tensors_or_models]
 
+def seed_everything(seed: int):    
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True)
 
 def main():
-    random.seed(0)
+    seed_everything(0)
+    print("Seed set to 0 for reproducibility.")
+    
+    warnings.filterwarnings("ignore", category=UserWarning)
+
+    parser = argparse.ArgumentParser(description='Drug response prediction.')
+    parser.add_argument('--gpu_id', dest='gpu_id', type=int,
+                        default='0', help='GPU devices. Use -1 for CPU.')
+    parser.add_argument('--embedding_path', type=str, default=None,
+                        help='Path to the gene expression embeddings.')
+    parser.add_argument('--test_drug', type=str,
+                        default=None, help='Hold-out drug.')
+    parser.add_argument('--val_drug', type=str, default=None,
+                        help='Drug used for early stopping.')
+
+    args = parser.parse_args()
+
+    TCGA_label_set = ["ALL", "BLCA", "BRCA", "CESC", "DLBC", "LIHC", "LUAD",
+                    "ESCA", "GBM", "HNSC", "KIRC", "LAML", "LCML", "LGG",
+                    "LUSC", "MESO", "MM", "NB", "OV", "PAAD", "SCLC", "SKCM",
+                    "STAD", "THCA", 'COAD/READ']
+    DPATH = './data'
+    Drug_info_file = f"./{DPATH}/drug/metadata.csv"
+    # '%s/CCLE/Cell_lines_annotations_20181226.txt' % DPATH
+    Cell_line_info_file = f"./{DPATH}/cell_line/metadata.txt"
+    # '%s/GDSC/drug_graph_feat' % DPATH
+    Drug_feature_file = f"./{DPATH}/drug/graph_feature"
+    # '%s/CCLE/GDSC_IC50.csv' % DPATH
+    Cancer_response_exp_file = f"./{DPATH}/ground_truth.csv"
+    Max_atoms = 100
+
+
+    assert (args.test_drug is None and args.val_drug is None) or (
+        args.test_drug != args.val_drug), "test_drug and val_drug must either both be None, or refer to different drugs."
+
     drug_feature, gexpr_feature, data_idx = MetadataGenerate(
-        Drug_info_file, Cell_line_info_file, Drug_feature_file, args.embedding_path, False)
+        Drug_info_file, Cell_line_info_file, Drug_feature_file, args.embedding_path, Cancer_response_exp_file)
 
     gexpr_dim = gexpr_feature.shape[-1]
 
     if args.test_drug is None and args.val_drug is None:
-        data_train_idx, data_real_idx = DataSplit(data_idx, ratio=0.95)
+        data_train_idx, data_real_idx = DataSplit(data_idx, TCGA_label_set, ratio=0.95)
         data_train_idx, data_test_idx = DataSplit(
-            data_train_idx, ratio=1-0.05/0.95)
+            data_train_idx, TCGA_label_set, ratio=1-0.05/0.95)
     else:
         data_train_idx, data_real_idx = DrugSplit(data_idx, args.test_drug)
         assert len(data_real_idx) > 0, "Test drug doesn't exist."
