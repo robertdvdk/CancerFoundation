@@ -1,7 +1,7 @@
 import argparse
 import random
 import os
-os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8' # A common configuration
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8' # Comment this out if not seeding
 
 import numpy as np
 import csv
@@ -181,7 +181,6 @@ def main():
     Drug_feature_file = f"./{DPATH}/drug/graph_feature"
     # '%s/CCLE/GDSC_IC50.csv' % DPATH
     Cancer_response_exp_file = f"./{DPATH}/ground_truth.csv"
-    Max_atoms = 100
 
 
     assert (args.test_drug is None and args.val_drug is None) or (
