@@ -32,7 +32,12 @@ def with_sdp_kernel(func):
 
 
 class TransformerModule(nn.Module):
-    """The main Transformer model for gene expression modeling. This model can be configured for both perceptual (masked language model-style) and generative tasks. It handles gene and expression value encoding, optional conditional information, and can be extended with modules for Masked Value Prediction for Cell-embeddings (MVC) and Domain Adversarial Training (DAT)."""
+    """The main Transformer model for gene expression modeling.
+
+    This model can be configured for both perceptual (masked language model-style) and generative tasks.
+    It handles gene and expression value encoding, optional conditional information,
+    and can be extended with modules for Masked Value Prediction for Cell-embeddings (MVC) and Domain Adversarial Training (DAT).
+    """
 
     def __init__(
         self,
@@ -351,8 +356,7 @@ class TransformerModule(nn.Module):
         gen_iters: int = 1,
         batch_labels: Optional[Tensor] = None,  # (batch,)
     ) -> Tensor:
-        """
-        Generates expression values from a cell embedding.
+        """Generates expression values from a cell embedding.
 
         Args:
             cell_emb (Tensor): Input cell embeddings of shape (batch, embsize).
@@ -505,8 +509,10 @@ class TransformerModule(nn.Module):
     def forward(
         self, tensors: dict[str, torch.Tensor], use_cell_embedding: bool = False
     ) -> Mapping[str, Tensor]:
-        """
-        Main forward pass that dispatches to generative or perceptual mode. This wrapper determines the training mode based on the `use_generative_training` attribute, computes the primary predictions and losses, and adds auxiliary losses from MVC, DAT, and a generative consistency loss.
+        """Main forward pass that dispatches to generative or perceptual mode.
+
+        This wrapper determines the training mode based on the `use_generative_training` attribute,
+        computes the primary predictions and losses, and adds auxiliary losses from MVC, DAT, and a generative consistency loss.
 
         Args:
             tensors (dict[str, torch.Tensor]): A dictionary of input tensors from the dataloader.
@@ -668,8 +674,7 @@ class TransformerModule(nn.Module):
         do_sample: bool = False,
         input_cell_emb: Optional[Tensor] = None,
     ) -> Mapping[str, Tensor]:
-        """
-        Forward pass for the generative training mode.
+        """Forward pass for the generative training mode.
 
         Args:
             pcpt_genes (Tensor): Token IDs of the perceptual part, shape [batch_size, seq_len].
@@ -700,9 +705,6 @@ class TransformerModule(nn.Module):
             transformer_output = torch.cat([pcpt_output, gen_output], dim=1)
 
         if self.conditions:
-            """print("condition encoders: ", self.condition_encoders)
-            for cond_name, cond_values in conditions.items():
-                print(cond_name, cond_values)"""
             condition_emb = torch.cat(
                 [
                     self.condition_encoders[cond_name](cond_values)
@@ -756,8 +758,7 @@ class TransformerModule(nn.Module):
         MVC: bool = False,
         do_sample: bool = False,
     ) -> Mapping[str, Tensor]:
-        """
-        Forward pass for the perceptual (MLM-style) training mode.
+        """Forward pass for the perceptual (MLM-style) training mode.
 
         Args:
             src (Tensor): Input token IDs, shape [batch_size, seq_len].
@@ -824,8 +825,7 @@ class TransformerModule(nn.Module):
         time_step: Optional[int] = None,
         return_np: bool = False,
     ) -> Tensor:
-        """
-        Encodes a large batch of data by splitting it into smaller mini-batches.
+        """Encodes a large batch of data by splitting it into smaller mini-batches.
 
         Args:
             src (Tensor): Input gene tokens of shape [N, seq_len].
@@ -1019,7 +1019,11 @@ class ConditionEncoder(nn.Module):
 
 
 class ExprDecoder(nn.Module):
-    """Decodes contextual gene embeddings to predict gene expression values. Takes the output of the transformer encoder for a gene as input and passes it through a feed-forward network to predict its expression value. If configured, it can also predict the probability of the gene's expression being zero."""
+    """Decodes contextual gene embeddings to predict gene expression values.
+
+    Takes the output of the transformer encoder for a gene as input and passes it through a feed-forward network to predict its expression value.
+    If configured, it can also predict the probability of the gene's expression being zero.
+    """
 
     def __init__(
         self,
@@ -1185,8 +1189,9 @@ class MVCDecoder(nn.Module):
 
 
 class AdversarialDiscriminator(nn.Module):
-    """
-    A discriminator for Domain Adversarial Training (DAT). This network takes cell embeddings as input and tries to predict their domain (e.g., batch of origin). It is used with a gradient reversal layer to encourage the main model to learn domain-invariant representations.
+    """A discriminator for Domain Adversarial Training (DAT).
+
+    This network takes cell embeddings as input and tries to predict their domain (e.g., batch of origin). It is used with a gradient reversal layer to encourage the main model to learn domain-invariant representations.
     """
 
     def __init__(

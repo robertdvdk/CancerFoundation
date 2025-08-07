@@ -9,10 +9,11 @@ from torch.nn.modules.transformer import _get_clones
 
 
 class MHA(nn.Module):
-    """
-    Custom Multi-Head Attention layer.
-    Custom MHA layer. This takes two separate forward passes on the pect
-    genes, and on the gen genes.
+    """A custom Multi-Head Attention layer for a perceptual-generative model.
+
+    This layer wraps PyTorch's MultiheadAttention but is designed to handle two separate input sequences: a perceptual (context) sequence and a generative (target) sequence.
+    It combines them, and applies an attention mask where the generative sequence attends to the perceptual sequence and not to other tokens in the generative sequence.
+    Finally, it splits the output back into perceptual and generative parts.
     """
 
     def __init__(
@@ -26,6 +27,18 @@ class MHA(nn.Module):
         device=None,
         dtype=None,
     ) -> None:
+        """Initializes the custom MHA layer.
+
+        Args:
+            embed_dim (int): Total dimension of the model.
+            num_heads (int): Number of parallel attention heads.
+            bias (bool, optional): If `True`, add a learnable bias to the input and output projections. Defaults to True.
+            batch_first (bool, optional): If `True`, then the input and output tensors are provided as (batch, seq, feature). Defaults to True.
+            attention_dropout (float, optional): Dropout probability on attention weights. Defaults to 0.0.
+            causal (bool, optional): If `True`, apply a causal mask to the attention scores. Defaults to False.
+            device: The desired device of the parameters and buffers in this module.
+            dtype: The desired floating point type of the parameters and buffers in this module.
+        """
         assert batch_first
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -57,13 +70,20 @@ class MHA(nn.Module):
         gen_key_padding_mask: Optional[Tensor] = None,
         need_weights=False,
     ):
-        """
-        pcpt_total_embs: (batch, pcpt_len, hidden_dim) (where hidden_dim = num heads * head dim)
-        gen_total_embs: (batch, gen_len, hidden_dim)
-        pcpt_key_padding_mask: bool tensor of shape (batch, pcpt_len), 1 means valid and 0 means not valid.
-        gen_key_padding_mask: bool tensor of shape (batch, gen_len), 1 means valid and 0 means not valid.
-        """
+        """Performs the forward pass with perceptual and generative sequences.
 
+        Args:
+            pcpt_total_embs (Tensor): The perceptual (context) sequence embeddings of shape (batch, pcpt_len, embed_dim).
+            gen_total_embs (Optional[Tensor]): The generative (target) sequence embeddings of shape (batch, gen_len, embed_dim). Can be None.
+            pcpt_key_padding_mask (Optional[Tensor], optional): Mask for the perceptual sequence where `True` indicates a padded element. Defaults to None.
+            gen_key_padding_mask (Optional[Tensor], optional): Mask for the generative sequence where `True` indicates a padded element. Defaults to None.
+            need_weights (bool, optional): If `True`, returns attention weights. Currently not supported. Defaults to False.
+
+        Returns:
+            A tuple containing two elements:
+            1. A tuple of (perceptual_output, generative_output) tensors.
+            2. A tuple of (None, None) as a placeholder for attention weights.
+        """
         assert not need_weights
 
         if gen_total_embs is None:
@@ -93,8 +113,11 @@ class MHA(nn.Module):
 
         @lru_cache(maxsize=1)
         def make_mask(len, gen_len, device):
+            """Creates a custom attention mask for the combined sequence.
+
+            The mask prevents all tokens from attending to the generative tokens,
+            effectively treating the perceptual sequence as context for generating the entire generative sequence at once.
             """
-            Creates an attention mask that prevents the model from looking at the"""
             attn_mask = torch.zeros(len, len).bool()
             attn_mask[:, -gen_len:] = True
             attn_mask.diagonal().fill_(False)
@@ -116,6 +139,7 @@ class MHA(nn.Module):
         return (out[:, :pcpt_seq_len], out[:, pcpt_seq_len:]), (None, None)
 
     def _forward_perceptual(self, total_embs, key_padding_mask):
+        """A simplified forward pass for only the perceptual sequence."""
         out, _ = self.self_attn(
             total_embs,
             total_embs,
@@ -126,26 +150,10 @@ class MHA(nn.Module):
 
 
 class CFLayer(nn.Module):
-    r"""TransformerEncoderLayer is made up of self-attn and feedforward network.
-    The class is modified from torch.nn.TransformerEncoderLayer to support the
-    FlashAttention.
-    Args:
-        d_model: the number of expected features in the input (required).
-        nhead: the number of heads in the multiheadattention models (required).
-        dim_feedforward: the dimension of the feedforward network model (default=2048).
-        dropout: the dropout value (default=0.1).
-        activation: the activation function of intermediate layer, relu or gelu (default=relu).
-        layer_norm_eps: the eps value in layer normalization components (default=1e-5).
-        batch_first: If ``True``, then the input and output tensors are provided
-            as (batch, seq, feature). Default: ``False``.
-    Examples::
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
-        >>> src = torch.rand(10, 32, 512)
-        >>> out = encoder_layer(src)
-    Alternatively, when ``batch_first`` is ``True``:
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8, batch_first=True)
-        >>> src = torch.rand(32, 10, 512)
-        >>> out = encoder_layer(src)
+    """A custom Transformer Encoder Layer for the perceptual-generative model.
+
+    This layer is composed of a custom Multi-Head Attention module (`MHA`) and a standard feed-forward network.
+    It supports both "pre-norm" and "post-norm" layer normalization schemes.
     """
 
     __constants__ = ["batch_first"]
@@ -163,6 +171,20 @@ class CFLayer(nn.Module):
         dtype=None,
         norm_scheme="post",  # "pre" or "post"
     ) -> None:
+        """Initializes the custom Transformer Encoder Layer.
+
+        Args:
+            d_model (int): The number of expected features in the input.
+            nhead (int): The number of heads in the multi-head attention models.
+            dim_feedforward (int, optional): The dimension of the feed-forward network. Defaults to 2048.
+            dropout (float, optional): The dropout value. Defaults to 0.1.
+            activation (str, optional): The activation function ('relu' or 'gelu'). Defaults to "relu".
+            layer_norm_eps (float, optional): The epsilon value for layer normalization. Defaults to 1e-5.
+            batch_first (bool, optional): If `True`, inputs are (batch, seq, feature). Defaults to True.
+            device: The desired device of the parameters and buffers.
+            dtype: The desired floating point type of the parameters and buffers.
+            norm_scheme (str, optional): The normalization scheme, either "pre" or "post". Defaults to "post".
+        """
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
         self.self_attn = MHA(
@@ -189,6 +211,7 @@ class CFLayer(nn.Module):
 
     @staticmethod
     def _get_activation_fn(activation):
+        """Returns the specified activation function."""
         if activation == "relu":
             return F.relu
         elif activation == "gelu":
@@ -201,20 +224,6 @@ class CFLayer(nn.Module):
             state["activation"] = F.relu
         super().__setstate__(state)
 
-    def _reverse_key_padding_mask(self, src_key_padding_mask):
-        """
-        Reverse the true false values of the key padding mask. This is because
-        we follow pytorch rule that the mask is True for padded tokens, but
-        in the inner flash MHA, it assumes the mask is False for padded tokens.
-        """
-        if src_key_padding_mask is None:
-            return None
-
-        if not src_key_padding_mask.any().item():
-            # no padding tokens in src
-            return None
-        return ~src_key_padding_mask
-
     def forward(
         self,
         pcpt_total_embs: Tensor,
@@ -222,19 +231,17 @@ class CFLayer(nn.Module):
         pcpt_key_padding_mask: Optional[Tensor] = None,
         gen_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
-        r"""Pass the input through the encoder layer.
-        Args:
-            src: the sequence to the encoder layer (required).
-            src_mask: the mask for the src sequence (optional).
-            src_key_padding_mask: the mask for the src keys per batch (optional).
-        Shape:
-            see the docs in Transformer class.
-        """
+        """Passes the perceptual and generative sequences through the encoder layer.
 
-        """pcpt_key_padding_mask_ = self._reverse_key_padding_mask(
-            pcpt_key_padding_mask)
-        gen_key_padding_mask_ = self._reverse_key_padding_mask(
-            gen_key_padding_mask)"""  # Used this when using Flash-Attention package
+        Args:
+            pcpt_total_embs (Tensor): The perceptual sequence embeddings.
+            gen_total_embs (Optional[Tensor]): The generative sequence embeddings.
+            pcpt_key_padding_mask (Optional[Tensor], optional): Mask for the perceptual sequence.
+            gen_key_padding_mask (Optional[Tensor], optional): Mask for the generative sequence.
+
+        Returns:
+            A tuple of (perceptual_output, generative_output) tensors after processing.
+        """
         pcpt_key_padding_mask_ = pcpt_key_padding_mask
         gen_key_padding_mask_ = gen_key_padding_mask
 
@@ -290,21 +297,9 @@ class CFLayer(nn.Module):
 
 
 class CFGenerator(nn.Module):
-    # takes in the set of different inputs in an mapping
-    r"""TransformerEncoder is a stack of N encoder layers. Users can build the
-    BERT(https://arxiv.org/abs/1810.04805) model with corresponding parameters.
-    Args:
-        encoder_layer: an instance of the TransformerEncoderLayer() class (required).
-        num_layers: the number of sub-encoder-layers in the encoder (required).
-        norm: the layer normalization component (optional).
-        enable_nested_tensor: if True, input will automatically convert to nested tensor
-            (and convert back on output). This will improve the overall performance of
-            TransformerEncoder when padding rate is high. Default: ``True`` (enabled).
-    Examples::
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
-        >>> transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=6)
-        >>> src = torch.rand(10, 32, 512)
-        >>> out = transformer_encoder(src)
+    """A Transformer Encoder composed of a stack of custom CFLayer layers.
+
+    This module sequentially processes input sequences through multiple `CFLayer` instances to produce final contextualized embeddings.
     """
 
     __constants__ = ["norm"]
@@ -316,6 +311,14 @@ class CFGenerator(nn.Module):
         norm=None,
         mask_check=True,
     ):
+        """Initializes the custom Transformer Encoder.
+
+        Args:
+            encoder_layer (CFLayer): An instance of the CFLayer class.
+            num_layers (int): The number of sub-encoder-layers in the encoder.
+            norm (Optional[nn.Module], optional): An optional final layer normalization.
+            mask_check (bool, optional): If `True`, performs checks on mask data types. Defaults to True.
+        """
         super().__init__()
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
@@ -329,13 +332,16 @@ class CFGenerator(nn.Module):
         pcpt_key_padding_mask: Optional[Tensor] = None,
         gen_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
-        r"""Pass the input through the encoder layers in turn.
+        """Passes the input through the stack of encoder layers.
+
         Args:
-            src: the sequence to the encoder (required).
-            mask: the mask for the src sequence (optional).
-            src_key_padding_mask: the mask for the src keys per batch (optional).
-        Shape:
-            see the docs in Transformer class.
+            pcpt_total_embs (Tensor): The perceptual sequence embeddings.
+            gen_total_embs (Optional[Tensor]): The generative sequence embeddings.
+            pcpt_key_padding_mask (Optional[Tensor], optional): Mask for the perceptual sequence.
+            gen_key_padding_mask (Optional[Tensor], optional): Mask for the generative sequence.
+
+        Returns:
+            A tuple of the final (perceptual_output, generative_output) tensors.
         """
         if pcpt_key_padding_mask is not None:
             _skpm_dtype = pcpt_key_padding_mask.dtype

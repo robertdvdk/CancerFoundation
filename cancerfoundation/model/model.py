@@ -9,9 +9,17 @@ from cancerfoundation.model.module import TransformerModule
 from cancerfoundation.loss import get_loss
 from safetensors import safe_open
 from cancerfoundation.loss import LossType
+from pytorch_lightning.utilities.types import OptimizerLRSchedulerConfig
 
 
 class CancerFoundation(pl.LightningModule):
+    """The main PyTorch Lightning module for the Cancer Foundation model.
+
+    This class encapsulates the entire model training, validation, and optimization pipeline.
+    It wraps the `TransformerModule` and handles hyperparameter configuration, loss calculation,
+    optimizer and scheduler setup, and the training/validation loops required by PyTorch Lightning.
+    """
+
     def __init__(
         self,
         n_bins: int,
@@ -45,6 +53,40 @@ class CancerFoundation(pl.LightningModule):
         balance_secondary: Optional[str] = None,
         zero_percentages: Optional[List[float]] = None,
     ):
+        """Initializes the CancerFoundation LightningModule.
+
+        Args:
+            n_bins (int): The number of bins for discretizing expression values.
+            input_emb_style (str): The style of input embedding ('category' or 'continuous').
+            max_seq_len (int): The maximum sequence length.
+            input_style (str): Style of input data processing.
+            mask_ratio (float): The ratio of tokens to mask for the MLM task.
+            TRUNC_BY_SAMPLE (bool): Whether to truncate sequences by sample.
+            training_tasks (str): The training tasks to perform ('mlm', 'gen', 'both').
+            embsize (int): The embedding size (d_model).
+            nheads (int): The number of attention heads.
+            d_hid (int): The dimension of the feed-forward hidden layer.
+            nlayers (int): The number of transformer layers.
+            dropout (float): The dropout rate.
+            lr (float): The learning rate.
+            epochs (int): The total number of training epochs.
+            vocab: The vocabulary mapping gene names to token IDs.
+            warmup_ratio_or_step (float): The ratio or number of steps for learning rate warmup.
+            scheduler_interval (int): The interval for the StepLR scheduler.
+            scheduler_factor (float): The factor for the StepLR scheduler.
+            compile_model (bool): If True, compile the model using `torch.compile`.
+            data_path (Union[str, os.PathLike]): The path to the data.
+            loss_type (LossType, optional): The type of loss function to use. Defaults to LossType.MSE.
+            conditions (Optional[List[str]], optional): A list of conditional variables. Defaults to None.
+            conditions_nums (Optional[Any], optional): A dictionary mapping condition names to their number of categories. Defaults to None.
+            mvc_decoder_style (str, optional): The architecture style for the MVC decoder. Defaults to "inner product".
+            scale_zero_expression (Optional[float], optional): A factor to scale the loss for zero-expression values. Defaults to None.
+            do_dat (bool, optional): If True, enable Domain Adversarial Training. Defaults to False.
+            explicit_zero_prob (Optional[bool], optional): If True, explicitly model zero probability. Defaults to False.
+            balance_primary (Optional[str], optional): The primary variable for balanced sampling. Defaults to None.
+            balance_secondary (Optional[str], optional): The secondary variable for balanced sampling. Defaults to None.
+            zero_percentages (Optional[List[float]], optional): Percentages for balancing zero expression. Defaults to None.
+        """
         super().__init__()
         self.save_hyperparameters(ignore=["vocab"])
         self.vocab = vocab
@@ -113,7 +155,7 @@ class CancerFoundation(pl.LightningModule):
         self._setup_model(mvc_decoder_style)
 
     def _setup_model(self, mvc_decoder_style: str):
-        """Initialize model and loss function"""
+        """Initializes the model and its loss function."""
         self.criterion = get_loss(
             loss_type=self.loss_type,
             num_classes=self.n_input_bins if self.n_input_bins else None,
@@ -144,13 +186,30 @@ class CancerFoundation(pl.LightningModule):
             self.model = torch.compile(self.model)
 
     def forward(self, data_dict, use_cell_embedding=None):
-        """Forward pass"""
+        """Performs a forward pass through the underlying `TransformerModule`.
+
+        Args:
+            data_dict (dict): A dictionary of input tensors.
+            use_cell_embedding (Optional[bool], optional): A flag to control a specific training behavior.
+                If None, uses the module's default. Defaults to None.
+
+        Returns:
+            dict: The output dictionary from the model, typically containing losses.
+        """
         if use_cell_embedding is None:
             use_cell_embedding = self.use_cell_embedding
         return self.model(data_dict, use_cell_embedding=use_cell_embedding)
 
     def training_step(self, batch, batch_idx):
-        """Training step"""
+        """Performs a single training step.
+
+        Args:
+            batch (dict): The batch of data from the DataLoader.
+            batch_idx (int): The index of the batch.
+
+        Returns:
+            torch.Tensor: The total loss for the batch.
+        """
         # Update use_cell_embedding based on global step
         self.use_cell_embedding = (
             self.USE_GENERATIVE_TRAINING and self.global_step > 1000
@@ -165,7 +224,15 @@ class CancerFoundation(pl.LightningModule):
         return loss_dict["total_loss"]
 
     def validation_step(self, batch, batch_idx):
-        """Validation step"""
+        """Performs a single validation step.
+
+        Args:
+            batch (dict): The batch of data from the DataLoader.
+            batch_idx (int): The index of the batch.
+
+        Returns:
+            dict: The dictionary of losses for the validation batch.
+        """
 
         if batch_idx == 0:
             print(
@@ -187,8 +254,15 @@ class CancerFoundation(pl.LightningModule):
 
         return loss_dict
 
-    def configure_optimizers(self):
-        """Configure optimizer and scheduler"""
+    def configure_optimizers(self) -> OptimizerLRSchedulerConfig:
+        """Configures the optimizer and learning rate scheduler.
+
+        Uses an Adam optimizer. If warmup is specified, it uses a cosine learning rate schedule with warmup.
+            Otherwise, it uses a step-based decay scheduler.
+
+        Returns:
+            dict: The optimizer and scheduler configuration for PyTorch Lightning.
+        """
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
         if self.warmup_ratio_or_step > 0:
@@ -233,7 +307,19 @@ class CancerFoundation(pl.LightningModule):
         gene_mapping: Optional[dict],
         verbose: bool = True,
     ):
-        """Load pretrained weights"""
+        """Loads pretrained weights from a checkpoint file into the current model.
+
+        This method supports both `.safetensors` and PyTorch `.pth`/`.pt` formats.
+        It can handle vocab mismatches by re-mapping gene embeddings if a
+        `gene_mapping` dictionary is provided.
+
+        Args:
+            pretrained_model_path (Path): Path to the pretrained model file.
+            gene_mapping (Optional[dict]): A dictionary to map gene names from the
+                pretrained vocab to the current vocab.
+            verbose (bool, optional): If True, prints information about matched
+                and unmatched weights. Defaults to True.
+        """
         if pretrained_model_path.name.endswith(".safetensors"):
             tensors = {}
             with safe_open(pretrained_model_path, framework="pt", device="cpu") as f:
