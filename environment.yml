@@ -115,4 +115,3 @@ dependencies:
       - urllib3==2.5.0
       - yarl==1.20.1
       - zipp==3.23.0
-prefix: /local/home/rvander/miniconda3/envs/CF
