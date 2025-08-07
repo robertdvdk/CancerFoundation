@@ -10,14 +10,14 @@
 	".devcontainer/devcontainer.env" // use this to set environment variables such as WANDB_API_KEY
 	],
 
-	// 👇 ADD THIS ENTIRE "mounts" SECTION
+	// Git integration
     "mounts": [
         "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached",
 		"source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind"
     ],
 
 	// Allow for tmux usage in the container, to run long training runs
-	"postCreateCommand": "apt-get update && apt-get install -y tmux",
+	"postCreateCommand": "apt-get update && apt-get install -y tmux && pip install pre-commit && pre-commit install",
 
 
 	// Configure tool-specific properties.

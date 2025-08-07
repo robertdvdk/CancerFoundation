@@ -20,5 +20,4 @@ python pretrain.py \
     --wandb "cells" \
     --strategy='ddp_find_unused_parameters_true' \
     --grad-accu-steps 16 \
-    --seed 0 \
-    --compile
+    --seed 0

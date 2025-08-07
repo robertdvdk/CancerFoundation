@@ -1,4 +1,4 @@
-from typing import Dict, Mapping, Optional, Tuple, Any, Union
+from typing import Dict, Mapping, Optional, Tuple, Union
 import warnings
 
 import torch
@@ -9,16 +9,23 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.distributions import Bernoulli
 from tqdm import trange
 
-from cancerfoundation.loss import LossType, criterion_neg_log_bernoulli, get_loss, masked_relative_error
+from cancerfoundation.loss import criterion_neg_log_bernoulli
 from .grad_reverse import grad_reverse
-import lightning as pl
 from .layers import CFLayer, CFGenerator
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
+
 def with_sdp_kernel(func):
     def wrapped_func(*args, **kwargs):
-        with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
+        with sdpa_kernel(
+            [
+                SDPBackend.FLASH_ATTENTION,
+                SDPBackend.EFFICIENT_ATTENTION,
+                SDPBackend.MATH,
+            ]
+        ):
             return func(*args, **kwargs)
+
     return wrapped_func
 
 
@@ -66,9 +73,8 @@ class TransformerModule(nn.Module):
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
 
-        self.encoder = GeneEncoder(
-                ntoken, d_model, padding_idx=pad_token_id)
-        
+        self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
+
         self.flag_encoder = nn.Embedding(2, d_model)
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
@@ -87,19 +93,20 @@ class TransformerModule(nn.Module):
         self.do_dat = do_dat
         self.criterion_conditions = nn.CrossEntropyLoss()
         self.criterion = criterion
-        
+
         if conditions:
             self.condition_encoders = nn.ModuleDict({})
             for cond_name, cond_num in self.conditions.items():
-                self.condition_encoders[cond_name] = ConditionEncoder(
-                    cond_num, d_model)
-            
+                self.condition_encoders[cond_name] = ConditionEncoder(cond_num, d_model)
+
             if do_dat:
                 self.grad_reverse_discriminators = nn.ModuleDict({})
                 for cond_name, cond_num in self.conditions.items():
-                    self.grad_reverse_discriminators[cond_name] = AdversarialDiscriminator(
-                        d_model,
-                        n_cls=cond_num,
+                    self.grad_reverse_discriminators[cond_name] = (
+                        AdversarialDiscriminator(
+                            d_model,
+                            n_cls=cond_num,
+                        )
                     )
 
         if batchnorm:
@@ -119,20 +126,18 @@ class TransformerModule(nn.Module):
                 batch_first=True,
                 norm_scheme=self.norm_scheme,
             )
-            self.transformer_encoder = CFGenerator(
-                encoder_layers, nlayers)
+            self.transformer_encoder = CFGenerator(encoder_layers, nlayers)
         else:
             encoder_layers = TransformerEncoderLayer(
                 d_model, nhead, d_hid, dropout, batch_first=True
             )
-            self.transformer_encoder = TransformerEncoder(
-                encoder_layers, nlayers)
+            self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
         self.decoder = ExprDecoder(
             d_model,
             explicit_zero_prob=explicit_zero_prob,
             conditions=self.conditions,
-            out_dim=out_dim
+            out_dim=out_dim,
         )
 
         if do_mvc:
@@ -141,10 +146,9 @@ class TransformerModule(nn.Module):
                 arch_style=mvc_decoder_style,
                 explicit_zero_prob=explicit_zero_prob,
                 conditions=self.conditions,
-                out_dim=out_dim
+                out_dim=out_dim,
             )
         self.MVC = do_mvc
-        
 
         self.init_weights()
 
@@ -174,15 +178,14 @@ class TransformerModule(nn.Module):
                 total_embs = src * values
             else:
                 total_embs = src + values
-            
+
             if getattr(self, "dsbn", None) is not None:
                 batch_label = int(domain_labels[0].item())
-                total_embs = self.dsbn(total_embs.permute(0, 2, 1), batch_label).permute(
-                    0, 2, 1
-                )  # the batch norm always works on dim 1
+                total_embs = self.dsbn(
+                    total_embs.permute(0, 2, 1), batch_label
+                ).permute(0, 2, 1)  # the batch norm always works on dim 1
             elif getattr(self, "bn", None) is not None:
                 total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
-            
 
             output = self.transformer_encoder(
                 total_embs, src_key_padding_mask=src_key_padding_mask
@@ -190,7 +193,8 @@ class TransformerModule(nn.Module):
 
         else:
             output_pcpt, _ = self.transformer_generate(
-                pcpt_genes=src, pcpt_values=values,
+                pcpt_genes=src,
+                pcpt_values=values,
                 pcpt_key_padding_mask=src_key_padding_mask,
                 gen_genes=None,
                 gen_key_padding_mask=None,
@@ -214,8 +218,7 @@ class TransformerModule(nn.Module):
 
         # (batch, pcpt_len, embsize)
         pcpt_token_embs = self.encoder(pcpt_genes)
-        pcpt_values = self.value_encoder(
-            pcpt_values)  # (batch, pcpt_len, embsize)
+        pcpt_values = self.value_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
         pcpt_total_embs = pcpt_token_embs + pcpt_values
 
         assert self.input_emb_style != "scaling"
@@ -225,10 +228,6 @@ class TransformerModule(nn.Module):
             self.cur_gene_token_embs = torch.cat(
                 [pcpt_token_embs, gen_token_embs], dim=1
             )
-
-            """print(gen_genes.shape)
-            print(pcpt_genes.shape)
-            print(pcpt_values.shape)"""
 
             gen_flags = self.flag_encoder(
                 torch.tensor(1).to(pcpt_values.device)
@@ -240,7 +239,11 @@ class TransformerModule(nn.Module):
             gen_total_embs = None
 
         if getattr(self, "bn", None) is not None:
-            total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
+            pcpt_total_embs = self.bn(pcpt_total_embs.permute(0, 2, 1)).permute(0, 2, 1)
+            if gen_total_embs is not None:
+                gen_total_embs = self.bn(gen_total_embs.permute(0, 2, 1)).permute(
+                    0, 2, 1
+                )
 
         if input_cell_emb is not None:
             pcpt_total_embs[:, 0, :] = input_cell_emb
@@ -272,8 +275,7 @@ class TransformerModule(nn.Module):
             cell_emb = torch.mean(layer_output, dim=1)
         elif self.cell_emb_style == "w-pool":
             if weights is None:
-                raise ValueError(
-                    "weights is required when cell_emb_style is w-pool")
+                raise ValueError("weights is required when cell_emb_style is w-pool")
             if weights.dim() != 2:
                 raise ValueError("weights should be 2D")
             cell_emb = torch.sum(layer_output * weights.unsqueeze(2), dim=1)
@@ -281,7 +283,9 @@ class TransformerModule(nn.Module):
 
         return cell_emb
 
-    def _check_condition_labels(self, condition_labels: Optional[Tensor] = None) -> None:
+    def _check_condition_labels(
+        self, condition_labels: Optional[Tensor] = None
+    ) -> None:
         """if self.use_batch_labels or self.domain_spec_batchnorm:
             assert batch_labels is not None
         elif batch_labels is not None:
@@ -313,7 +317,7 @@ class TransformerModule(nn.Module):
         # TODO: if gen_iters > 1, should have a tag indicate the current iteration
         try:
             self._check_batch_labels(batch_labels)
-        except:
+        except ValueError:
             warnings.warn(
                 "batch_labels is required but not provided, using zeros instead"
             )
@@ -359,8 +363,7 @@ class TransformerModule(nn.Module):
             else torch.cat(
                 [
                     transformer_output,
-                    batch_emb.unsqueeze(1).repeat(
-                        1, transformer_output.shape[1], 1),
+                    batch_emb.unsqueeze(1).repeat(1, transformer_output.shape[1], 1),
                 ],
                 dim=2,
             ),
@@ -400,58 +403,68 @@ class TransformerModule(nn.Module):
         if self.do_dat:
             if self.conditions:
                 output["condition_output"] = {}
-                for cond_name, discriminator in self.grad_reverse_discriminators.items():
+                for (
+                    cond_name,
+                    discriminator,
+                ) in self.grad_reverse_discriminators.items():
                     output["condition_output"][cond_name] = discriminator(cell_emb)
 
         return output
-    
+
     def _prepare_generative_input(self, tensors: dict[str, torch.Tensor]):
         pcpt_gene = tensors["pcpt_gene"]
         pcpt_expr = tensors["pcpt_expr"]
-        pcpt_key_padding_mask = pcpt_gene.eq(
-            self.pad_token_id)
+        pcpt_key_padding_mask = pcpt_gene.eq(self.pad_token_id)
         gen_gene = tensors["gen_gene"]
-        gen_expr_target = target_values = tensors["gen_expr_target"]
-        gen_key_padding_mask = gen_gene.eq(
-            self.pad_token_id)
-        
-        return pcpt_gene, pcpt_expr, pcpt_key_padding_mask, gen_gene, gen_expr_target, gen_key_padding_mask
-        
+        gen_expr_target = tensors["gen_expr_target"]
+        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
+
+        return (
+            pcpt_gene,
+            pcpt_expr,
+            pcpt_key_padding_mask,
+            gen_gene,
+            gen_expr_target,
+            gen_key_padding_mask,
+        )
+
     def _prepare_perceptual_input(self, tensors: dict[str, torch.Tensor]):
         input_gene_ids = tensors["gene"]
         input_values = tensors["masked_expr"]
         target_values = tensors["expr"]
-        src_key_padding_mask = input_gene_ids.eq(
-            self.pad_token_id)
-         
+        src_key_padding_mask = input_gene_ids.eq(self.pad_token_id)
+
         return input_gene_ids, input_values, src_key_padding_mask, target_values
-        
-        
 
     def forward(
-        self,
-        tensors: dict[str, torch.Tensor],
-        use_cell_embedding: bool = False
+        self, tensors: dict[str, torch.Tensor], use_cell_embedding: bool = False
     ) -> Mapping[str, Tensor]:
         """
         Wrapper to call either generative_forward or perceptual_forward, depending
         on the value of the "generative_training" kwarg.
         """
-        
+
         loss_dict = {}
         conditions_batch = tensors["conditions"] if self.conditions else None
         if self.use_generative_training:
-            
-            pcpt_gene, pcpt_expr, pcpt_key_padding_mask, gen_gene, gen_expr_target, gen_key_padding_mask = self._prepare_generative_input(tensors)
-            output_dict = self.generative_forward(pcpt_gene,
-                    pcpt_expr,
-                    pcpt_key_padding_mask,
-                    gen_gene,
-                    gen_key_padding_mask,
-                    MVC=self.MVC,
-                    conditions=conditions_batch
-                    )
-            
+            (
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_expr_target,
+                gen_key_padding_mask,
+            ) = self._prepare_generative_input(tensors)
+            output_dict = self.generative_forward(
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_key_padding_mask,
+                MVC=self.MVC,
+                conditions=conditions_batch,
+            )
+
             gen_expr_preds = output_values = output_dict["gen_preds"]
 
             positions_to_match = ~gen_key_padding_mask
@@ -459,13 +472,16 @@ class TransformerModule(nn.Module):
             loss = loss_expr = self.criterion(
                 gen_expr_preds, gen_expr_target, positions_to_match
             )
-            loss_dict["loss_expr"] = loss_expr       
-            
+            loss_dict["loss_expr"] = loss_expr
+
             if self.MVC:
                 loss_mvc = self.criterion(
-                    output_dict["mvc_output"][:, pcpt_gene.shape[1]:], gen_expr_target, positions_to_match)
+                    output_dict["mvc_output"][:, pcpt_gene.shape[1] :],
+                    gen_expr_target,
+                    positions_to_match,
+                )
                 loss = loss + loss_mvc
-                loss_dict["loss_mvc"] = loss_mvc       
+                loss_dict["loss_mvc"] = loss_mvc
 
             if self.explicit_zero_prob:
                 loss_zero_log_prob = criterion_neg_log_bernoulli(
@@ -475,15 +491,25 @@ class TransformerModule(nn.Module):
                 loss_dict["loss_zero_log_prob"] = loss_zero_log_prob
                 if self.MVC:
                     loss_gepc_zero_log_prob = criterion_neg_log_bernoulli(
-                        output_dict["mvc_zero_probs"], gen_expr_target, positions_to_match
+                        output_dict["mvc_zero_probs"],
+                        gen_expr_target,
+                        positions_to_match,
                     )
                     loss = loss + loss_gepc_zero_log_prob
                     loss_dict["loss_gepc_zero_log_prob"] = loss_gepc_zero_log_prob
 
         else:
-            input_gene_ids, input_values, src_key_padding_mask, target_values = self._prepare_perceptual_input(tensors)
-            output_dict = self.perceptual_forward(input_gene_ids, input_values, src_key_padding_mask=src_key_padding_mask, conditions=conditions_batch, MVC=MVC)
-            
+            input_gene_ids, input_values, src_key_padding_mask, target_values = (
+                self._prepare_perceptual_input(tensors)
+            )
+            output_dict = self.perceptual_forward(
+                input_gene_ids,
+                input_values,
+                src_key_padding_mask=src_key_padding_mask,
+                conditions=conditions_batch,
+                MVC=self.MVC,
+            )
+
             output_values = output_dict["mlm_output"]
 
             positions_to_match = input_values.eq(
@@ -498,7 +524,7 @@ class TransformerModule(nn.Module):
                     output_dict["mvc_output"], target_values, positions_to_match
                 )
                 loss = loss + loss_mvc
-            
+
             if self.explicit_zero_prob:
                 loss_zero_log_prob = criterion_neg_log_bernoulli(
                     output_dict["mlm_zero_probs"], target_values, positions_to_match
@@ -510,22 +536,21 @@ class TransformerModule(nn.Module):
                         output_dict["mvc_zero_probs"], target_values, positions_to_match
                     )
                     loss = loss + loss_gepc_zero_log_prob
-                    
-        
+
         if self.do_dat:
             if self.conditions:
                 for condition in self.conditions:
-                    
-                    
                     condition_loss = self.criterion_conditions(
-                        output_dict["condition_output"][condition], conditions_batch[condition].squeeze())
-                    
+                        output_dict["condition_output"][condition],
+                        conditions_batch[condition].squeeze(),
+                    )
+
                     loss += condition_loss / len(self.conditions)
-                    
-                    loss_dict["condition_" + condition] = condition_loss.detach() / len(self.conditions)
-                    
-                
-            
+
+                    loss_dict["condition_" + condition] = condition_loss.detach() / len(
+                        self.conditions
+                    )
+
         previous_cell_embs = output_dict["cell_emb"].detach()
         preds = self.generative_forward(
             pcpt_gene,
@@ -535,17 +560,16 @@ class TransformerModule(nn.Module):
             gen_key_padding_mask,
             MVC=False,
             input_cell_emb=previous_cell_embs,
-            conditions=conditions_batch
+            conditions=conditions_batch,
         )["gen_preds"]
 
-        loss_gen = self.criterion(
-            preds, gen_expr_target, positions_to_match)
+        loss_gen = self.criterion(preds, gen_expr_target, positions_to_match)
         loss = loss + use_cell_embedding * loss_gen
         loss_dict["loss_gen"] = loss_gen
-          
-        loss_dict["total_loss"] = loss       
+
+        loss_dict["total_loss"] = loss
         return loss_dict
-        
+
     @with_sdp_kernel
     def training_step(self, batch, batch_idx):
         loss_dict = self.model(batch, use_cell_embedding=False)
@@ -606,8 +630,13 @@ class TransformerModule(nn.Module):
             """print("condition encoders: ", self.condition_encoders)
             for cond_name, cond_values in conditions.items():
                 print(cond_name, cond_values)"""
-            condition_emb = torch.cat([self.condition_encoders[cond_name](
-                cond_values) for cond_name, cond_values in conditions.items()], dim=1).view(transformer_output.shape[0], -1)
+            condition_emb = torch.cat(
+                [
+                    self.condition_encoders[cond_name](cond_values)
+                    for cond_name, cond_values in conditions.items()
+                ],
+                dim=1,
+            ).view(transformer_output.shape[0], -1)
 
         output = {}
         decoder_output = self.decoder(
@@ -617,7 +646,8 @@ class TransformerModule(nn.Module):
                 [
                     transformer_output,
                     condition_emb.unsqueeze(1).repeat(
-                        1, transformer_output.shape[1], 1),
+                        1, transformer_output.shape[1], 1
+                    ),
                 ],
                 dim=2,
             ),
@@ -626,11 +656,11 @@ class TransformerModule(nn.Module):
             bernoulli = Bernoulli(probs=decoder_output["zero_probs"])
             full_preds = bernoulli.sample() * decoder_output["pred"]
             output["pcpt_preds"] = full_preds[:, : pcpt_genes.shape[1]]
-            output["gen_preds"] = full_preds[:, pcpt_genes.shape[1]:]
+            output["gen_preds"] = full_preds[:, pcpt_genes.shape[1] :]
         else:
             full_preds = decoder_output["pred"]  # (batch, seq_len)
             output["pcpt_preds"] = full_preds[:, : pcpt_genes.shape[1]]
-            output["gen_preds"] = full_preds[:, pcpt_genes.shape[1]:]
+            output["gen_preds"] = full_preds[:, pcpt_genes.shape[1] :]
         if self.explicit_zero_prob:
             output["zero_probs"] = decoder_output["zero_probs"]
 
@@ -670,12 +700,15 @@ class TransformerModule(nn.Module):
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self.encode(
-            src, values, src_key_padding_mask, conditions
-        )
+        transformer_output = self.encode(src, values, src_key_padding_mask, conditions)
         if self.conditions:
-            condition_emb = torch.cat([self.condition_encoders[cond_name](
-                cond_values) for cond_name, cond_values in conditions.items()], dim=1).view(transformer_output.shape[0], -1)
+            condition_emb = torch.cat(
+                [
+                    self.condition_encoders[cond_name](cond_values)
+                    for cond_name, cond_values in conditions.items()
+                ],
+                dim=1,
+            ).view(transformer_output.shape[0], -1)
 
         output = {}
         mlm_output = self.decoder(
@@ -685,12 +718,13 @@ class TransformerModule(nn.Module):
                 [
                     transformer_output,
                     condition_emb.unsqueeze(1).repeat(
-                        1, transformer_output.shape[1], 1),
+                        1, transformer_output.shape[1], 1
+                    ),
                 ],
                 dim=2,
             ),
         )
-    
+
         if self.explicit_zero_prob and do_sample:
             bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
             output["mlm_output"] = bernoulli.sample() * mlm_output["pred"]
@@ -752,15 +786,12 @@ class TransformerModule(nn.Module):
             if self.conditions:
                 conditions_i = {}
                 for cond_name, cond_values in conditions.items():
-                    conditions_i[cond_name] = cond_values[i: i +
-                                                          batch_size].to(device)
+                    conditions_i[cond_name] = cond_values[i : i + batch_size].to(device)
             raw_output = self.encode(
-                src[i: i + batch_size].to(device),
-                values[i: i + batch_size].to(device),
-                src_key_padding_mask[i: i + batch_size].to(device),
-                conditions_i
-                if conditions
-                else None,
+                src[i : i + batch_size].to(device),
+                values[i : i + batch_size].to(device),
+                src_key_padding_mask[i : i + batch_size].to(device),
+                conditions_i if conditions else None,
             )
 
             output = raw_output.detach()
@@ -770,9 +801,10 @@ class TransformerModule(nn.Module):
                 output = output.numpy()
             if time_step is not None:
                 output = output[:, time_step, :]
-            outputs[i: i + batch_size] = output
+            outputs[i : i + batch_size] = output
 
         return outputs
+
 
 class GeneEncoder(nn.Module):
     def __init__(
@@ -863,6 +895,12 @@ class ConditionEncoder(nn.Module):
 
 
 class ExprDecoder(nn.Module):
+    """
+    Decoder for the gene expression values. Takes a contextualised embedding of a gene (output of the transformer encoder) as input
+    and uses that to predict the gene expression value.
+    If `explicit_zero_prob` is True, it also predicts the probability of the gene expression being zero.
+    """
+
     def __init__(
         self,
         d_model: int,
@@ -871,7 +909,7 @@ class ExprDecoder(nn.Module):
         conditions: Dict = None,
     ):
         super().__init__()
-        d_in = d_model * (len(conditions)+1) if conditions else d_model
+        d_in = d_model * (len(conditions) + 1) if conditions else d_model
         self.fc = nn.Sequential(
             nn.Linear(d_in, d_model),
             nn.LeakyReLU(),
@@ -890,6 +928,7 @@ class ExprDecoder(nn.Module):
             )
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
+        """"""
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         pred_value = self.fc(x).squeeze(-1)  # (batch, seq_len)
 
@@ -898,7 +937,6 @@ class ExprDecoder(nn.Module):
         zero_logits = self.zero_logit(x).squeeze(-1)  # (batch, seq_len)
         zero_probs = torch.sigmoid(zero_logits)
         return dict(pred=pred_value, zero_probs=zero_probs)
-
 
 
 class MVCDecoder(nn.Module):
@@ -929,7 +967,7 @@ class MVCDecoder(nn.Module):
         super().__init__()
         # Inner products don't work with output dimension > 1
 
-        d_in = d_model * (len(conditions)+1) if conditions else d_model
+        d_in = d_model * (len(conditions) + 1) if conditions else d_model
         self.out_dim = out_dim
         if arch_style in ["inner product", "inner product, detach"]:
             self.gene2query = nn.Linear(d_model, d_model)
@@ -942,7 +980,7 @@ class MVCDecoder(nn.Module):
         elif arch_style == "concat query":
             self.gene2query = nn.Linear(d_model, 64)
             self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_in+64, 64)
+            self.fc1 = nn.Linear(d_in + 64, 64)
             self.hidden_activation = hidden_activation()
             self.fc2 = nn.Linear(64, out_dim)
         elif arch_style == "sum query":
@@ -978,8 +1016,7 @@ class MVCDecoder(nn.Module):
             if not self.explicit_zero_prob:
                 return dict(pred=pred_value)
             # zero logits need to based on the cell_emb, because of input exprs
-            zero_logits = torch.bmm(self.W_zero_logit(
-                query_vecs), cell_emb).squeeze(2)
+            zero_logits = torch.bmm(self.W_zero_logit(query_vecs), cell_emb).squeeze(2)
             zero_probs = torch.sigmoid(zero_logits)
             return dict(pred=pred_value, zero_probs=zero_probs)
         elif self.arch_style == "concat query":

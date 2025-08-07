@@ -10,6 +10,7 @@ from torch.nn.modules.transformer import _get_clones
 
 class MHA(nn.Module):
     """
+    Custom Multi-Head Attention layer.
     Custom MHA layer. This takes two separate forward passes on the pect
     genes, and on the gen genes.
     """
@@ -65,48 +66,63 @@ class MHA(nn.Module):
 
         assert not need_weights
 
-        if gen_total_embs == None:
+        if gen_total_embs is None:
             return self._forward_perceptual(pcpt_total_embs, pcpt_key_padding_mask)
-        pcpt_seq_len, gen_seq_len = pcpt_total_embs.shape[
-            1], 0 if gen_total_embs == None else gen_total_embs.shape[1]
+        pcpt_seq_len, gen_seq_len = (
+            pcpt_total_embs.shape[1],
+            0 if gen_total_embs is None else gen_total_embs.shape[1],
+        )
         total_seq_len = pcpt_seq_len + gen_seq_len
 
-        if pcpt_key_padding_mask == None:
-            pcpt_key_padding_mask = torch.zeros(
-                pcpt_total_embs.shape[0], pcpt_seq_len).bool().to(pcpt_total_embs.device)
-        if gen_key_padding_mask == None:
-            gen_key_padding_mask = torch.zeros(
-                gen_total_embs.shape[0], gen_seq_len).bool().to(pcpt_total_embs.device)
+        if pcpt_key_padding_mask is None:
+            pcpt_key_padding_mask = (
+                torch.zeros(pcpt_total_embs.shape[0], pcpt_seq_len)
+                .bool()
+                .to(pcpt_total_embs.device)
+            )
+        if gen_key_padding_mask is None:
+            gen_key_padding_mask = (
+                torch.zeros(gen_total_embs.shape[0], gen_seq_len)
+                .bool()
+                .to(pcpt_total_embs.device)
+            )
 
         key_padding_mask = torch.cat(
-            [pcpt_key_padding_mask, gen_key_padding_mask], dim=1).to(pcpt_total_embs.device)
+            [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
+        ).to(pcpt_total_embs.device)
 
         @lru_cache(maxsize=1)
         def make_mask(len, gen_len, device):
+            """
+            Creates an attention mask that prevents the model from looking at the"""
             attn_mask = torch.zeros(len, len).bool()
             attn_mask[:, -gen_len:] = True
             attn_mask.diagonal().fill_(False)
             return attn_mask.to(device)
 
-        attn_mask = make_mask(
-            total_seq_len, gen_seq_len, pcpt_total_embs.device)
+        attn_mask = make_mask(total_seq_len, gen_seq_len, pcpt_total_embs.device)
 
         total_embs = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
 
-        out, _ = self.self_attn(total_embs, total_embs, total_embs, key_padding_mask=key_padding_mask.to(pcpt_total_embs.device),
-                                attn_mask=attn_mask, need_weights=need_weights)
+        out, _ = self.self_attn(
+            total_embs,
+            total_embs,
+            total_embs,
+            key_padding_mask=key_padding_mask.to(pcpt_total_embs.device),
+            attn_mask=attn_mask,
+            need_weights=need_weights,
+        )
 
         return (out[:, :pcpt_seq_len], out[:, pcpt_seq_len:]), (None, None)
 
-    def _forward_perceptual(
-        self,
-        total_embs,
-        key_padding_mask
-    ):
-        out, _ = self.self_attn(total_embs, total_embs, total_embs,
-                                key_padding_mask=key_padding_mask.to(key_padding_mask.device))
+    def _forward_perceptual(self, total_embs, key_padding_mask):
+        out, _ = self.self_attn(
+            total_embs,
+            total_embs,
+            total_embs,
+            key_padding_mask=key_padding_mask.to(key_padding_mask.device),
+        )
         return (out, None), (None, None)
-
 
 
 class CFLayer(nn.Module):
@@ -131,6 +147,7 @@ class CFLayer(nn.Module):
         >>> src = torch.rand(32, 10, 512)
         >>> out = encoder_layer(src)
     """
+
     __constants__ = ["batch_first"]
 
     def __init__(
@@ -160,10 +177,8 @@ class CFLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
 
-        self.norm1 = nn.LayerNorm(
-            d_model, eps=layer_norm_eps, **factory_kwargs)
-        self.norm2 = nn.LayerNorm(
-            d_model, eps=layer_norm_eps, **factory_kwargs)
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
 
@@ -179,8 +194,7 @@ class CFLayer(nn.Module):
         elif activation == "gelu":
             return F.gelu
 
-        raise RuntimeError(
-            "activation should be relu/gelu, not {}".format(activation))
+        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
 
     def __setstate__(self, state):
         if "activation" not in state:
@@ -242,14 +256,12 @@ class CFLayer(nn.Module):
             pcpt_total_embs = pcpt_total_embs + self.dropout2(pcpt_total_embs2)
 
             if gen_total_embs is not None:
-                gen_total_embs = gen_total_embs + \
-                    self.dropout1(gen_total_embs2)
+                gen_total_embs = gen_total_embs + self.dropout1(gen_total_embs2)
                 gen_total_embs = self.norm2(gen_total_embs)
                 gen_total_embs2 = self.linear2(
                     self.dropout(self.activation(self.linear1(gen_total_embs)))
                 )
-                gen_total_embs = gen_total_embs + \
-                    self.dropout2(gen_total_embs2)
+                gen_total_embs = gen_total_embs + self.dropout2(gen_total_embs2)
         else:
             pcpt_total_embs2, gen_total_embs2 = self.self_attn(
                 pcpt_total_embs,
@@ -266,14 +278,12 @@ class CFLayer(nn.Module):
             pcpt_total_embs = self.norm2(pcpt_total_embs)
 
             if gen_total_embs is not None:
-                gen_total_embs = gen_total_embs + \
-                    self.dropout1(gen_total_embs2)
+                gen_total_embs = gen_total_embs + self.dropout1(gen_total_embs2)
                 gen_total_embs = self.norm1(gen_total_embs)
                 gen_total_embs2 = self.linear2(
                     self.dropout(self.activation(self.linear1(gen_total_embs)))
                 )
-                gen_total_embs = gen_total_embs + \
-                    self.dropout2(gen_total_embs2)
+                gen_total_embs = gen_total_embs + self.dropout2(gen_total_embs2)
                 gen_total_embs = self.norm2(gen_total_embs)
 
         return pcpt_total_embs, gen_total_embs
@@ -296,6 +306,7 @@ class CFGenerator(nn.Module):
         >>> src = torch.rand(10, 32, 512)
         >>> out = transformer_encoder(src)
     """
+
     __constants__ = ["norm"]
 
     def __init__(

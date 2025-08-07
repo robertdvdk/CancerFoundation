@@ -32,7 +32,7 @@ class CancerFoundation(pl.LightningModule):
         warmup_ratio_or_step: float,
         scheduler_interval: int,
         scheduler_factor: float,
-        compile: bool,
+        compile_model: bool,
         data_path: Union[str, os.PathLike],
         loss_type: LossType = LossType.MSE,
         conditions: Optional[List[str]] = None,
@@ -70,7 +70,7 @@ class CancerFoundation(pl.LightningModule):
         self.loss_type = loss_type
         self.data_path = data_path
         self.epochs = epochs
-        self.compile = compile
+        self.compile_model = compile_model
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -140,7 +140,7 @@ class CancerFoundation(pl.LightningModule):
             do_dat=self.do_dat,
             explicit_zero_prob=self.explicit_zero_prob,
         )
-        if self.compile:
+        if self.compile_model:
             self.model = torch.compile(self.model)
 
     def forward(self, data_dict, use_cell_embedding=None):
