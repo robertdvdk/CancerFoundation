@@ -33,7 +33,8 @@
 				"ms-toolsai.vscode-jupyter-cell-tags",
 				"ms-toolsai.vscode-jupyter-slideshow",
 				"mechatroner.rainbow-csv",
-				"rioj7.command-variable"
+				"rioj7.command-variable",
+				"njpwerner.autodocstring"
 			]
 		}
 	}

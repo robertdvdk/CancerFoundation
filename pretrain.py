@@ -148,7 +148,7 @@ def main():
             zero_percentages=args.zero_percentages,
             balance_primary=args.balance_primary,
             balance_secondary=args.balance_secondary,
-            compile=args.compile,
+            compile_model=args.compile,
         )
 
     if args.pretrained:

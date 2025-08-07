@@ -1,4 +1,4 @@
-from typing import Dict, Mapping, Optional, Tuple, Union
+from typing import Dict, Mapping, Optional, Tuple, Union, Type
 import warnings
 
 import torch
@@ -16,6 +16,8 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 
 
 def with_sdp_kernel(func):
+    """Decorator to run a function within the Scaled Dot-Product Attention kernel context."""
+
     def wrapped_func(*args, **kwargs):
         with sdpa_kernel(
             [
@@ -30,6 +32,8 @@ def with_sdp_kernel(func):
 
 
 class TransformerModule(nn.Module):
+    """The main Transformer model for gene expression modeling. This model can be configured for both perceptual (masked language model-style) and generative tasks. It handles gene and expression value encoding, optional conditional information, and can be extended with modules for Masked Value Prediction for Cell-embeddings (MVC) and Domain Adversarial Training (DAT)."""
+
     def __init__(
         self,
         ntoken: int,
@@ -54,6 +58,31 @@ class TransformerModule(nn.Module):
         do_dat: bool = False,
         batchnorm: bool = False,
     ):
+        """Initializes the TransformerModule.
+
+        Args:
+            ntoken (int): The number of unique gene tokens.
+            d_model (int): The dimensionality of the model embeddings.
+            out_dim (int): The output dimension of the decoders.
+            nhead (int): The number of attention heads in the transformer.
+            d_hid (int): The dimension of the feedforward network model in the transformer.
+            nlayers (int): The number of transformer encoder layers.
+            pad_value (int): The value used for padding in the input expression values.
+            pad_token_id (int): The token ID used for padding.
+            criterion: The loss function for expression prediction.
+            dropout (float, optional): The dropout rate. Defaults to 0.0.
+            do_mvc (bool, optional): Whether to include the MVC decoder. Defaults to False.
+            conditions (Dict, optional): A dictionary defining conditional variables, mapping condition names to the number of categories. Defaults to None.
+            input_emb_style (str, optional): The style of input value embedding ("continuous", "category", "scaling"). Defaults to "continuous".
+            n_input_bins (Optional[int], optional): The number of bins for categorical value embedding. Required if `input_emb_style` is "category". Defaults to None.
+            cell_emb_style (str, optional): The method to obtain cell embeddings ("cls", "avg-pool", "w-pool"). Defaults to "cls".
+            mvc_decoder_style (str, optional): The architecture for the MVC decoder. Defaults to "inner product".
+            explicit_zero_prob (bool, optional): Whether to explicitly predict zero-expression probability. Defaults to False.
+            use_generative_training (bool, optional): Whether to use the generative training setup. Defaults to False.
+            pre_norm (bool, optional): Whether to use pre-layer normalization in the transformer. Defaults to False.
+            do_dat (bool, optional): Whether to include Domain Adversarial Training. Defaults to False.
+            batchnorm (bool, optional): Whether to use batch normalization on the input embeddings. Defaults to False.
+        """
         super().__init__()
         self.model_type = "Transformer"
         self.d_model = d_model
@@ -82,7 +111,7 @@ class TransformerModule(nn.Module):
             self.value_encoder = ContinuousValueEncoder(d_model, dropout)
         elif input_emb_style == "category":
             assert n_input_bins > 0
-            self.value_encoder = CategoryValueEncoder(
+            self.value_encoder = CategoricalValueEncoder(
                 n_input_bins, d_model, padding_idx=pad_value
             )
         else:
@@ -93,7 +122,6 @@ class TransformerModule(nn.Module):
         self.do_dat = do_dat
         self.criterion_conditions = nn.CrossEntropyLoss()
         self.criterion = criterion
-
         if conditions:
             self.condition_encoders = nn.ModuleDict({})
             for cond_name, cond_num in self.conditions.items():
@@ -111,10 +139,7 @@ class TransformerModule(nn.Module):
 
         if batchnorm:
             self.bn = nn.BatchNorm1d(d_model, eps=6.1e-5)
-        # else:
-        #     print("Using simple batchnorm instead of domain specific batchnorm")
-        #     self.bn = nn.BatchNorm1d(d_model, eps=6.1e-5)
-        # bug
+
         self.use_generative_training = use_generative_training
 
         if use_generative_training:
@@ -153,6 +178,7 @@ class TransformerModule(nn.Module):
         self.init_weights()
 
     def init_weights(self) -> None:
+        """Initializes the weights of the gene embedding layer."""
         initrange = 0.1
         self.encoder.embedding.weight.data.uniform_(-initrange, initrange)
 
@@ -164,6 +190,18 @@ class TransformerModule(nn.Module):
         conditions: Optional[Dict] = None,
         domain_labels: Optional[Tensor] = None,
     ) -> Tensor:
+        """Encodes gene IDs and expression values into contextual embeddings. This method is used during perceptual (non-generative) training.
+
+        Args:
+            src (Tensor): Input gene token IDs of shape (batch, seq_len).
+            values (Tensor): Input expression values of shape (batch, seq_len).
+            src_key_padding_mask (Tensor): Padding mask of shape (batch, seq_len).
+            conditions (Optional[Dict], optional): Dictionary of condition tensors. Defaults to None.
+            domain_labels (Optional[Tensor], optional): Domain labels for domain-specific batch normalization. Defaults to None.
+
+        Returns:
+            Tensor: The output of the Transformer encoder, of shape (batch, seq_len, embsize).
+        """
         if not self.use_generative_training:
             self._check_condition_labels(conditions)
 
@@ -214,6 +252,21 @@ class TransformerModule(nn.Module):
         input_cell_emb: Optional[Tensor] = None,  # (batch, seq_len, embsize)
         domain_labels: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor]:
+        """Processes inputs through the generative transformer model.
+
+        Args:
+            pcpt_genes (Tensor): Gene tokens for the perceptual (context) part.
+            pcpt_values (Tensor): Expression values for the perceptual part.
+            pcpt_key_padding_mask (Tensor): Padding mask for the perceptual part.
+            gen_genes (Tensor): Gene tokens for the generative (target) part.
+            gen_key_padding_mask (Tensor): Padding mask for the generative part.
+            conditions (Optional[Tensor], optional): Conditional labels. Defaults to None.
+            input_cell_emb (Optional[Tensor], optional): Pre-computed cell embeddings to inject. Defaults to None.
+            domain_labels (Optional[Tensor], optional): Domain labels for domain-specific batch normalization. Defaults to None.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing the transformer output for the perceptual and generative parts, respectively.
+        """
         self._check_condition_labels(conditions)
 
         # (batch, pcpt_len, embsize)
@@ -258,22 +311,22 @@ class TransformerModule(nn.Module):
         return pcpt_output, gen_output
 
     def _get_cell_emb_from_layer(
-        self, layer_output: Tensor, weights: Tensor = None
+        self, layer_output: Tensor, weights: Optional[Tensor] = None
     ) -> Tensor:
-        """
+        """Extracts cell embeddings from the transformer's output layer.
+
         Args:
-            layer_output(:obj:`Tensor`): shape (batch, seq_len, embsize)
-            weights(:obj:`Tensor`): shape (batch, seq_len), optional and only used
-                when :attr:`self.cell_emb_style` is "w-pool".
+            layer_output (Tensor): The transformer output tensor of shape (batch, seq_len, embsize).
+            weights (Optional[Tensor], optional): A tensor of weights of shape (batch, seq_len) used only when `self.cell_emb_style` is "w-pool".
 
         Returns:
-            :obj:`Tensor`: shape (batch, embsize)
+            Tensor: The extracted cell embeddings of shape (batch, embsize).
         """
         if self.cell_emb_style == "cls":
             cell_emb = layer_output[:, 0, :]  # (batch, embsize)
         elif self.cell_emb_style == "avg-pool":
             cell_emb = torch.mean(layer_output, dim=1)
-        elif self.cell_emb_style == "w-pool":
+        else:  # self.cell_emb_style == "w-pool"
             if weights is None:
                 raise ValueError("weights is required when cell_emb_style is w-pool")
             if weights.dim() != 2:
@@ -286,13 +339,7 @@ class TransformerModule(nn.Module):
     def _check_condition_labels(
         self, condition_labels: Optional[Tensor] = None
     ) -> None:
-        """if self.use_batch_labels or self.domain_spec_batchnorm:
-            assert batch_labels is not None
-        elif batch_labels is not None:
-            raise ValueError(
-                "batch_labels should only be provided when `self.use_batch_labels`"
-                " or `self.domain_spec_batchnorm` is True"
-            )"""
+        """Validates that condition labels are provided if and only if conditions are defined for the model."""
         assert bool(self.conditions) == bool(condition_labels)
 
     def generate(
@@ -305,13 +352,18 @@ class TransformerModule(nn.Module):
         batch_labels: Optional[Tensor] = None,  # (batch,)
     ) -> Tensor:
         """
+        Generates expression values from a cell embedding.
+
         Args:
-            cell_emb(:obj:`Tensor`): shape (batch, embsize)
-            src(:obj:`Tensor`): shape (batch, seq_len)
-            values(:obj:`Tensor`): shape (batch, seq_len), optional
-            src_key_padding_mask(:obj:`Tensor`): shape (batch, seq_len), optional
-            gen_iters(:obj:`int`): number of generation iterations
-            batch_labels(:obj:`Tensor`): shape (batch,), optional
+            cell_emb (Tensor): Input cell embeddings of shape (batch, embsize).
+            src (Tensor): Source gene token IDs of shape (batch, seq_len).
+            values (Optional[Tensor], optional): Source expression values of shape (batch, seq_len). Defaults to None.
+            src_key_padding_mask (Optional[Tensor], optional): Padding mask for the source tensor. Defaults to None.
+            gen_iters (int, optional): Number of generation iterations. Defaults to 1.
+            batch_labels (Optional[Tensor], optional): Batch labels for conditions. Defaults to None.
+
+        Returns:
+            Tensor: The predicted expression values of shape (batch, seq_len).
         """
         # TODO: should have a tag indicate the generation mode
         # TODO: if gen_iters > 1, should have a tag indicate the current iteration
@@ -381,6 +433,18 @@ class TransformerModule(nn.Module):
         MVC: bool = False,
         do_sample: bool = False,
     ) -> Mapping[str, Tensor]:
+        """Extends the output dictionary with cell embeddings and optional predictions.
+
+        Args:
+            output (Mapping[str, Tensor]): The dictionary of current outputs.
+            transformer_output (Tensor): The raw output from the transformer encoder.
+            condition_emb (Optional[Tensor], optional): The embedding for conditional variables. Defaults to None.
+            MVC (bool, optional): If True, adds MVC (Masked Value for Cell-embedding) predictions. Defaults to False.
+            do_sample (bool, optional): If True, samples from the Bernoulli distribution for zero-inflation. Defaults to False.
+
+        Returns:
+            Mapping[str, Tensor]: The extended output dictionary.
+        """
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
 
@@ -412,6 +476,7 @@ class TransformerModule(nn.Module):
         return output
 
     def _prepare_generative_input(self, tensors: dict[str, torch.Tensor]):
+        """Prepares tensors for the generative forward pass."""
         pcpt_gene = tensors["pcpt_gene"]
         pcpt_expr = tensors["pcpt_expr"]
         pcpt_key_padding_mask = pcpt_gene.eq(self.pad_token_id)
@@ -429,6 +494,7 @@ class TransformerModule(nn.Module):
         )
 
     def _prepare_perceptual_input(self, tensors: dict[str, torch.Tensor]):
+        """Prepares tensors for the perceptual forward pass."""
         input_gene_ids = tensors["gene"]
         input_values = tensors["masked_expr"]
         target_values = tensors["expr"]
@@ -440,8 +506,14 @@ class TransformerModule(nn.Module):
         self, tensors: dict[str, torch.Tensor], use_cell_embedding: bool = False
     ) -> Mapping[str, Tensor]:
         """
-        Wrapper to call either generative_forward or perceptual_forward, depending
-        on the value of the "generative_training" kwarg.
+        Main forward pass that dispatches to generative or perceptual mode. This wrapper determines the training mode based on the `use_generative_training` attribute, computes the primary predictions and losses, and adds auxiliary losses from MVC, DAT, and a generative consistency loss.
+
+        Args:
+            tensors (dict[str, torch.Tensor]): A dictionary of input tensors from the dataloader.
+            use_cell_embedding (bool, optional): If True, a consistency loss is added by feeding the cell embedding back into the generative forward pass. Defaults to False.
+
+        Returns:
+            Mapping[str, Tensor]: A dictionary of losses for training.
         """
 
         loss_dict = {}
@@ -572,6 +644,15 @@ class TransformerModule(nn.Module):
 
     @with_sdp_kernel
     def training_step(self, batch, batch_idx):
+        """Performs a single training step (for PyTorch Lightning).
+
+        Args:
+            batch: The batch of data from the DataLoader.
+            batch_idx: The index of the batch.
+
+        Returns:
+            The total loss for the batch.
+        """
         loss_dict = self.model(batch, use_cell_embedding=False)
         return loss_dict["total_loss"]
 
@@ -588,30 +669,22 @@ class TransformerModule(nn.Module):
         input_cell_emb: Optional[Tensor] = None,
     ) -> Mapping[str, Tensor]:
         """
+        Forward pass for the generative training mode.
+
         Args:
-            pcpt_genes (:obj:`Tensor`): token ids of the perceptual part, shape
-                [batch_size, seq_len]
-            pcpt_values (:obj:`Tensor`): token values of the perceptual part, shape
-                [batch_size, seq_len]
-            pcpt_key_padding_mask (:obj:`Tensor`): mask for pcpt_genes, shape
-                [batch_size, seq_len]
-            gen_genes (:obj:`Tensor`): token ids of the generative part, shape
-                [batch_size, seq_len]
-            gen_key_padding_mask (:obj:`Tensor`): mask for gen_genes, shape
-                [batch_size, seq_len]
-            batch_labels (:obj:`Tensor`): batch labels, shape [batch_size]
-            do_sample (:obj:`bool`): whether to do sampling from bernoulli for
-                generated zero predictions.
-            input_cell_emb (:obj:`Tensor`): cell embeddings, shape [batch_size,
-                embsize]
+            pcpt_genes (Tensor): Token IDs of the perceptual part, shape [batch_size, seq_len].
+            pcpt_values (Tensor): Token values of the perceptual part, shape [batch_size, seq_len].
+            pcpt_key_padding_mask (Tensor): Mask for pcpt_genes, shape [batch_size, seq_len].
+            gen_genes (Tensor): Token IDs of the generative part, shape [batch_size, seq_len].
+            gen_key_padding_mask (Tensor): Mask for gen_genes, shape [batch_size, seq_len].
+            conditions (Optional[Dict], optional): Dictionary of condition tensors. Defaults to None.
+            MVC (bool, optional): If True, computes MVC output. Defaults to False.
+            do_sample (bool, optional): If True, samples from Bernoulli for zero predictions. Defaults to False.
+            input_cell_emb (Optional[Tensor], optional): Pre-computed cell embeddings to inject, shape [batch_size, embsize]. Defaults to None.
 
         Returns:
-            :obj:`Mapping[str, Tensor]`:
-                - pred (:obj:`Tensor`): prediction, shape [batch_size, seq_len]
-                - cell_emb (:obj:`Tensor`): cell embeddings, shape [batch_size,
-                    embsize]
+            Mapping[str, Tensor]: A dictionary containing predictions ('pcpt_preds', 'gen_preds'), cell embeddings ('cell_emb'), and other optional outputs.
         """
-
         pcpt_output, gen_output = self.transformer_generate(
             pcpt_genes,
             pcpt_values,
@@ -684,21 +757,18 @@ class TransformerModule(nn.Module):
         do_sample: bool = False,
     ) -> Mapping[str, Tensor]:
         """
+        Forward pass for the perceptual (MLM-style) training mode.
+
         Args:
-            src (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
-            values (:obj:`Tensor`): token values, shape [batch_size, seq_len]
-            src_key_padding_mask (:obj:`Tensor`): mask for src, shape [batch_size,
-                seq_len]
-            batch_labels (:obj:`Tensor`): batch labels, shape [batch_size]
-            CLS (:obj:`bool`): if True, return the celltype classification objective
-                (CLS) output
-            CCE (:obj:`bool`): if True, return the contrastive cell embedding objective
-                (CCE) output
-            MVC (:obj:`bool`): if True, return the masked value prediction for cell
-                embedding MVC output
+            src (Tensor): Input token IDs, shape [batch_size, seq_len].
+            values (Tensor): Input expression values (with masking), shape [batch_size, seq_len].
+            src_key_padding_mask (Tensor): Mask for src, shape [batch_size, seq_len].
+            conditions (Optional[Dict], optional): Dictionary of condition tensors. Defaults to None.
+            MVC (bool, optional): If True, computes MVC output. Defaults to False.
+            do_sample (bool, optional): If True, samples from Bernoulli for zero predictions. Defaults to False.
 
         Returns:
-            dict of output Tensors.
+            Mapping[str, Tensor]: A dictionary containing MLM predictions ('mlm_output'), cell embeddings ('cell_emb'), and other optional outputs.
         """
         transformer_output = self.encode(src, values, src_key_padding_mask, conditions)
         if self.conditions:
@@ -755,19 +825,20 @@ class TransformerModule(nn.Module):
         return_np: bool = False,
     ) -> Tensor:
         """
+        Encodes a large batch of data by splitting it into smaller mini-batches.
+
         Args:
-            src (Tensor): shape [N, seq_len]
-            values (Tensor): shape [N, seq_len]
-            src_key_padding_mask (Tensor): shape [N, seq_len]
-            batch_size (int): batch size for encoding
-            batch_labels (Tensor): shape [N, n_batch_labels]
-            output_to_cpu (bool): whether to move the output to cpu
-            time_step (int): the time step index in the transformer output to return.
-                The time step is along the second dimenstion. If None, return all.
-            return_np (bool): whether to return numpy array
+            src (Tensor): Input gene tokens of shape [N, seq_len].
+            values (Tensor): Input expression values of shape [N, seq_len].
+            src_key_padding_mask (Tensor): Padding mask of shape [N, seq_len].
+            batch_size (int): The size of mini-batches to process.
+            conditions (Optional[Dict], optional): Dictionary of condition tensors. Defaults to None.
+            output_to_cpu (bool, optional): If True, moves the output to CPU memory. Defaults to True.
+            time_step (Optional[int], optional): If specified, returns only the embedding at this time step. Defaults to None.
+            return_np (bool, optional): If True, returns the output as a NumPy array. Defaults to False.
 
         Returns:
-            output Tensor of shape [N, seq_len, embsize]
+            Union[Tensor, np.ndarray]: The encoded embeddings of shape [N, seq_len, embsize] or [N, embsize] if `time_step` is specified.
         """
         N = src.size(0)
         device = next(self.parameters()).device
@@ -807,12 +878,21 @@ class TransformerModule(nn.Module):
 
 
 class GeneEncoder(nn.Module):
+    """Embeds integer gene IDs. Allows the model to learn a distinct representation for each gene."""
+
     def __init__(
         self,
         num_embeddings: int,
         embedding_dim: int,
         padding_idx: Optional[int] = None,
     ):
+        """Initializes the gene encoder.
+
+        Args:
+            num_embeddings (int): The total number of unique genes.
+            embedding_dim (int): The dimensionality of the gene embeddings.
+            padding_idx (Optional[int], optional): The index of the padding token. Defaults to None.
+        """
         super().__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
@@ -820,15 +900,21 @@ class GeneEncoder(nn.Module):
         self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Encodes a batch of gene IDs.
+
+        Args:
+            x (Tensor): A tensor of gene IDs of shape (batch, seq_len).
+
+        Returns:
+            Tensor: The resulting embeddings of shape (batch, seq_len, embsize).
+        """
         x = self.embedding(x)  # (batch, seq_len, embsize)
         x = self.enc_norm(x)
         return x
 
 
 class ContinuousValueEncoder(nn.Module):
-    """
-    Encode real number values to a vector using neural nets projection.
-    """
+    """Embeds continuous gene expression values using a small feed-forward network. Used when the input values aren't binned."""
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512):
         super().__init__()
@@ -840,9 +926,13 @@ class ContinuousValueEncoder(nn.Module):
         self.max_value = max_value
 
     def forward(self, x: Tensor) -> Tensor:
-        """
+        """Embeds a batch of continuous expression values.
+
         Args:
-            x: Tensor, shape [batch_size, seq_len]
+            x (Tensor): A tensor of expression values of shape (batch, seq_len).
+
+        Returns:
+            Tensor: The resulting embeddings of shape (batch, seq_len, d_model).
         """
         # TODO: test using actual embedding layer if input is categorical
         # expand last dimension
@@ -855,13 +945,22 @@ class ContinuousValueEncoder(nn.Module):
         return self.dropout(x)
 
 
-class CategoryValueEncoder(nn.Module):
+class CategoricalValueEncoder(nn.Module):
+    """Embeds discretized (binned) gene expression values using an embedding layer."""
+
     def __init__(
         self,
         num_embeddings: int,
         embedding_dim: int,
         padding_idx: Optional[int] = None,
     ):
+        """Initializes the categorical value encoder.
+
+        Args:
+            num_embeddings (int): The number of discrete bins for expression values.
+            embedding_dim (int): The dimensionality of the value embeddings.
+            padding_idx (Optional[int], optional): The index of the padding value. Defaults to None.
+        """
         super().__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
@@ -869,6 +968,14 @@ class CategoryValueEncoder(nn.Module):
         self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Embeds a batch of binned expression values.
+
+        Args:
+            x (Tensor): A tensor of binned values of shape (batch, seq_len).
+
+        Returns:
+            Tensor: The resulting embeddings of shape (batch, seq_len, embsize).
+        """
         x = x.long()
         x = self.embedding(x)  # (batch, seq_len, embsize)
         x = self.enc_norm(x)
@@ -876,12 +983,21 @@ class CategoryValueEncoder(nn.Module):
 
 
 class ConditionEncoder(nn.Module):
+    """Embeds integer condition IDs, allowing the model to be conditioned on categorical metadata, such as cell type or sequencing technology."""
+
     def __init__(
         self,
         num_embeddings: int,
         embedding_dim: int,
         padding_idx: Optional[int] = None,
     ):
+        """Initializes the condition encoder.
+
+        Args:
+            num_embeddings (int): Number of unique conditions.
+            embedding_dim (int): Dimension of the condition embeddings.
+            padding_idx (Optional[int], optional): Padding index for the embeddings. Defaults to None.
+        """
         super().__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
@@ -889,25 +1005,37 @@ class ConditionEncoder(nn.Module):
         self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)  # (batch, embsize)
+        """Encodes the input conditions.
+
+        Args:
+            x (Tensor): Input tensor of shape (batch).
+
+        Returns:
+            Tensor: Encoded tensor of shape (batch, embedding_dim).
+        """
+        x = self.embedding(x)  # (batch, embedding_dim)
         x = self.enc_norm(x)
         return x
 
 
 class ExprDecoder(nn.Module):
-    """
-    Decoder for the gene expression values. Takes a contextualised embedding of a gene (output of the transformer encoder) as input
-    and uses that to predict the gene expression value.
-    If `explicit_zero_prob` is True, it also predicts the probability of the gene expression being zero.
-    """
+    """Decodes contextual gene embeddings to predict gene expression values. Takes the output of the transformer encoder for a gene as input and passes it through a feed-forward network to predict its expression value. If configured, it can also predict the probability of the gene's expression being zero."""
 
     def __init__(
         self,
         d_model: int,
         out_dim: int,
         explicit_zero_prob: bool = False,
-        conditions: Dict = None,
+        conditions: Optional[Dict] = None,
     ):
+        """Initialises the gene expression value decoder.
+
+        Args:
+            d_model (int): Dimension of the input embeddings.
+            out_dim (int): Dimension of the output gene expression values.
+            explicit_zero_prob (bool, optional): Whether to predict the probability of zero expression. Defaults to False.
+            conditions (Optional[Dict], optional): Configuration for additional conditions, used to adjust the input dimension. Defaults to None.
+        """
         super().__init__()
         d_in = d_model * (len(conditions) + 1) if conditions else d_model
         self.fc = nn.Sequential(
@@ -928,8 +1056,15 @@ class ExprDecoder(nn.Module):
             )
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
-        """"""
-        """x is the output of the transformer, (batch, seq_len, d_model)"""
+        """Forward pass for the gene expression value decoder.
+
+        Args:
+            x (Tensor): Input tensor from the transformer encoder of shape (batch, seq_len, d_in).
+
+        Returns:
+            Dict[str, Tensor]: A dictionary containing the predicted expression values ('pred') and,
+            if applicable, the zero expression probabilities ('zero_probs').
+        """
         pred_value = self.fc(x).squeeze(-1)  # (batch, seq_len)
 
         if not self.explicit_zero_prob:
@@ -940,29 +1075,31 @@ class ExprDecoder(nn.Module):
 
 
 class MVCDecoder(nn.Module):
-    """
-    Decoder for the masked value prediction for cell embeddings.
-    """
+    """Decoder for the Masked Value Prediction for Cell embeddings (MVC) task."""
 
     def __init__(
         self,
         d_model: int,
         out_dim: int,
         arch_style: str = "inner product",
-        query_activation: nn.Module = nn.Sigmoid,
-        hidden_activation: nn.Module = nn.PReLU,
+        query_activation: Type[nn.Module] = nn.Sigmoid,
+        hidden_activation: Type[nn.Module] = nn.PReLU,
         explicit_zero_prob: bool = False,
-        conditions: Dict = None,
+        conditions: Optional[Dict] = None,
     ) -> None:
-        """
+        """Initialises the MVC decoder.
+
         Args:
-            d_model (:obj:`int`): dimension of the gene embedding.
-            arch_style (:obj:`str`): architecture style of the decoder, choice from
-                1. "inner product" or 2. "concat query" or 3. "sum query".
-            query_activation (:obj:`nn.Module`): activation function for the query
-                vectors.
-            hidden_activation (:obj:`nn.Module`): activation function for the hidden
-                layers.
+            d_model (int): Dimension of the model embeddings.
+            out_dim (int): Dimension of the output gene expression values.
+            arch_style (str, optional): Architecture style of the decoder ('inner product', 'concat query', 'sum query'). Defaults to "inner product".
+            query_activation (Type[nn.Module], optional): Activation function for the query vectors. Defaults to nn.Sigmoid.
+            hidden_activation (Type[nn.Module], optional): Activation function for hidden layers. Defaults to nn.PReLU.
+            explicit_zero_prob (bool, optional): Whether to predict the probability of zero expression. Defaults to False.
+            conditions (Optional[Dict], optional): Configuration for additional conditions. Defaults to None.
+
+        Raises:
+            ValueError: If an unknown architecture style is provided.
         """
         super().__init__()
         # Inner products don't work with output dimension > 1
@@ -999,10 +1136,17 @@ class MVCDecoder(nn.Module):
     def forward(
         self, cell_emb: Tensor, gene_embs: Tensor
     ) -> Union[Tensor, Dict[str, Tensor]]:
-        """
+        """Forward pass for the MVC decoder.
+
         Args:
-            cell_emb: Tensor, shape (batch, embsize=d_model)
-            gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
+            cell_emb (Tensor): Cell embedding tensor of shape (batch, d_in).
+            gene_embs (Tensor): Gene embedding tensor of shape (batch, seq_len, d_model).
+
+        Raises:
+            NotImplementedError: If explicit zero probability is enabled with 'concat query' or 'sum query' architecture.
+
+        Returns:
+            Dict[str, Tensor]: A dictionary of predicted gene expression values ('pred') and optional zero probabilities ('zero_probs').
         """
         gene_embs = gene_embs.detach() if self.do_detach else gene_embs
         if self.arch_style in ["inner product", "inner product, detach"]:
@@ -1030,7 +1174,7 @@ class MVCDecoder(nn.Module):
             if self.explicit_zero_prob:
                 raise NotImplementedError
             return dict(pred=self.fc2(h).squeeze(2))  # (batch, seq_len)
-        elif self.arch_style == "sum query":
+        else:  # self.arch_style == "sum query":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
             cell_emb = cell_emb.unsqueeze(1)
 
@@ -1042,7 +1186,7 @@ class MVCDecoder(nn.Module):
 
 class AdversarialDiscriminator(nn.Module):
     """
-    Discriminator for the adversarial training for batch correction.
+    A discriminator for Domain Adversarial Training (DAT). This network takes cell embeddings as input and tries to predict their domain (e.g., batch of origin). It is used with a gradient reversal layer to encourage the main model to learn domain-invariant representations.
     """
 
     def __init__(
@@ -1050,21 +1194,32 @@ class AdversarialDiscriminator(nn.Module):
         d_model: int,
         n_cls: int,
         nlayers: int = 3,
-        activation: callable = nn.LeakyReLU,
+        activation: Type[nn.Module] = nn.LeakyReLU,
     ):
+        """Initializes the AdversarialDiscriminator.
+
+        Args:
+            d_model (int): Dimension of the input embeddings (cell embeddings).
+            n_cls (int): Number of domain classes to predict.
+            nlayers (int, optional): Number of layers in the discriminator network. Defaults to 3.
+            activation (Type[nn.Module], optional): Activation function for hidden layers. Defaults to nn.LeakyReLU.
+        """
         super().__init__()
-        # module list
         self._decoder = nn.ModuleList()
-        for i in range(nlayers - 1):
+        for _ in range(nlayers - 1):
             self._decoder.append(nn.Linear(d_model, d_model))
             self._decoder.append(activation())
             self._decoder.append(nn.LayerNorm(d_model))
         self.out_layer = nn.Linear(d_model, n_cls)
 
     def forward(self, x: Tensor) -> Tensor:
-        """
+        """Forward pass for the discriminator.
+
         Args:
-            x: Tensor, shape [batch_size, embsize]
+            x (Tensor): Input tensor (cell embeddings) of shape [batch_size, d_model].
+
+        Returns:
+            Tensor: Output logits of shape [batch_size, n_cls].
         """
         x = grad_reverse(x, scale=1.0)
         for layer in self._decoder:
