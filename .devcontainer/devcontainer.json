@@ -3,12 +3,6 @@
 {
 	"name": "scgpt",
 	"image": "nvcr.io/nvidia/clara/bionemo-framework:nightly",
-	// "build": {
-	// 	// Sets the run context to one level up instead of the .devcontainer folder.
-	// 	"context": "..",
-	// 	// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
-	// 	"dockerfile": "./bionemo.Dockerfile"
-	// },
 	"runArgs": [
     "--gpus",
     "all",
@@ -22,10 +16,6 @@
 		"source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind"
     ],
 
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-
-	// Uncomment the next line to run commands after the container is created.
 	// Allow for tmux usage in the container, to run long training runs
 	"postCreateCommand": "apt-get update && apt-get install -y tmux",
 
@@ -46,8 +36,5 @@
 				"rioj7.command-variable"
 			]
 		}
-	},
-
-	// Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "devcontainer"
+	}
 }

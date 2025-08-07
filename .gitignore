@@ -3,9 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Conda environment files
-*.env
-
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
@@ -25,3 +22,5 @@ debug_data/
 *.csv
 *.pth
 *.tar
+
+*.code-workspace
