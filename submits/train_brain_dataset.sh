@@ -1,12 +1,12 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_dataset
-#SBATCH --time=00:05:00
+#SBATCH --output=./slurmlogs/outputs/train_brain_dataset_%j_%t.out  # <-- CHANGED
+#SBATCH --error=./slurmlogs/errors/train_brain_dataset_%j_%t.err   # <-- CHANGED
+#SBATCH --time=12:00:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=15
 #SBATCH --gpus-per-task=1
-#SBATCH --output=slurmlogs/outputs/%x_%j_%t.out
-#SBATCH --error=slurmlogs/errors/%x_%j_%t.err
+#SBATCH --cpus-per-task=15
 
 mkdir -p ./slurmlogs/outputs
 mkdir -p ./slurmlogs/errors
