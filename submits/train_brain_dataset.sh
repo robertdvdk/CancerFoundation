@@ -5,6 +5,8 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=15
 #SBATCH --gpus-per-task=1
+#SBATCH --output=slurmlogs/outputs/%x_%j_%t.out
+#SBATCH --error=slurmlogs/errors/%x_%j_%t.err
 
 mkdir -p ./slurmlogs/outputs
 mkdir -p ./slurmlogs/errors
