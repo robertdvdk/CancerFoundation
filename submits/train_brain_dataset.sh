@@ -2,9 +2,13 @@
 #SBATCH --job-name=train_brain_dataset
 #SBATCH --time=00:05:00
 #SBATCH --partition=gpu
-#SBATCH --tasks=1
-#SBATCH --cpus-per-task=60
+#SBATCH --tasks=4
+#SBATCH --cpus-per-task=15
+#SBATCH --gpus-per-task=1
 #SBATCH --gres=gpu:rtx4090:4
+
+mkdir -p ./slurmlogs/outputs
+mkdir -p ./slurmlogs/errors
 
 singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
