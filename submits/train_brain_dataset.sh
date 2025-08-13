@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_dataset
-#SBATCH --output=./slurmlogs/%x_%j.out
+#SBATCH --output=./%x_%j.out
 #SBATCH --time=00:05:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=4
