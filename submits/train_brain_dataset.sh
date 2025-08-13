@@ -1,0 +1,21 @@
+python pretrain.py \
+    --gpus 1 \
+    --save-dir ./save/cf_brain-$(date +%b%d-%H-%M-%Y) \
+    --max-seq-len 1200 \
+    --batch-size 8 \
+    --nlayers 6 \
+    --nheads 8 \
+    --embsize 128 \
+    --d-hi 256 \
+    --epochs 50 \
+    --lr 0.0001 \
+    --warmup-ratio-or-step 10000 \
+    --val-check-interval 0.5 \
+    --trunc-by-sample \
+    --loss mse \
+    --balance-primary technology \
+    --train-path ./DATA/processed_data/train \
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp_find_unused_parameters_true' \
+    --seed 0 \
+    --wandb "brain"

@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=create_dataset
-#SBATCH --output=create_dataset_%j.out
-#SBATCH --error=create_dataset_%j.err
+#SBATCH --output=./slurmlogs/outputs/create_dataset_%j.out
+#SBATCH --error=./slurmlogs/errors/create_dataset_%j.err
 #SBATCH --time=00:05:00
 
 singularity run \
