@@ -2,7 +2,7 @@
 #SBATCH --job-name=train_brain_dataset
 #SBATCH --time=00:05:00
 #SBATCH --partition=gpu
-#SBATCH --tasks=4
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=15
 #SBATCH --gpus-per-task=1
 
