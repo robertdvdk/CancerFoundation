@@ -17,12 +17,12 @@ def train_model(
     datamodule: pl.LightningDataModule,
     max_epochs: int,
     save_dir: str,
+    precision: str,
     num_nodes: int = 1,
     gpus: int = 4,
     wandb_project: Optional[str] = None,
-    wandb_entitiy: Optional[str] = None,
+    wandb_entity: Optional[str] = None,
     resume_from_checkpoint: Optional[str] = None,
-    precision: str = "bf16",
     strategy: str = "auto",
     gradient_clip_val: float = 1.0,
     accumulate_grad_batches: int = 1,
@@ -65,7 +65,7 @@ def train_model(
     logger = None
     if wandb_project:
         logger = WandbLogger(
-            entity=wandb_entitiy,
+            entity=wandb_entity,
             project=wandb_project,
         )
 
@@ -172,10 +172,10 @@ def main():
         resume_from_checkpoint=args.resume_from_checkpoint,
         val_check_interval=args.val_check_interval,
         wandb_project=args.wandb,
-        wandb_entitiy=args.wandb_entity,
+        wandb_entity=args.wandb_entity,
         accumulate_grad_batches=args.grad_accu_steps,
         strategy=args.strategy,
-        precision="bf16-mixed",
+        precision=args.precision,
     )
 
 

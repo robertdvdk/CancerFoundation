@@ -5,6 +5,13 @@ sys.path.insert(0, "../")
 from cancerfoundation.loss import LossType
 from pathlib import Path
 from pytorch_lightning.callbacks import TQDMProgressBar
+from enum import Enum
+
+
+class Precision(str, Enum):
+    MIXED = "16-mixed"
+    FULL_32 = "32"
+    BFLOAT = "bf16-mixed"
 
 
 def get_args():
@@ -14,6 +21,14 @@ def get_args():
         "--save-dir",
         type=str,
         help="The directory to save the trained model and the results.",
+    )
+
+    parser.add_argument(
+        "--precision",
+        type=str,
+        choices=["32", "16-mixed", "bf16-mixed"],
+        default="32",
+        help="The precision to use for training. Default is 32.",
     )
 
     parser.add_argument(

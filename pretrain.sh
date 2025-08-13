@@ -25,7 +25,7 @@ which python
 
 LOG_INTERVAL=16
 MAX_LENGTH=1200
-per_proc_batch_size=16
+per_proc_batch_size=8
 LAYERS=6
 EMBSIZE=128
 JOB_NAME="cancerfoundation"
@@ -43,9 +43,9 @@ accelerate launch --config-file="./config.yaml" \
     --nlayers $LAYERS \
     --nheads 8 \
     --embsize $EMBSIZE \
-    --d-hi 128 \
+    --d-hi 256 \
     --grad-accu-steps 4 \
-    --epochs 10 \
+    --epochs 15 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --log-interval $LOG_INTERVAL \
