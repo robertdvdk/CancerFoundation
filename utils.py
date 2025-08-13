@@ -292,6 +292,13 @@ def get_args():
         action="store_true",
         help="Whether to compile the model with torch.compile. Default is False.",
     )
+
+    parser.add_argument(
+        "--wandb-name",
+        type=str,
+        default=None,
+        help="Run name to use for Weights and Biases",
+    )
     return parser.parse_args()
 
 

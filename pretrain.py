@@ -22,6 +22,7 @@ def train_model(
     gpus: int = 4,
     wandb_project: Optional[str] = None,
     wandb_entity: Optional[str] = None,
+    wandb_name: Optional[str] = None,
     resume_from_checkpoint: Optional[str] = None,
     strategy: str = "auto",
     gradient_clip_val: float = 1.0,
@@ -67,6 +68,7 @@ def train_model(
         logger = WandbLogger(
             entity=wandb_entity,
             project=wandb_project,
+            name=wandb_name,
         )
 
     # Create trainer
@@ -173,6 +175,7 @@ def main():
         val_check_interval=args.val_check_interval,
         wandb_project=args.wandb,
         wandb_entity=args.wandb_entity,
+        wandb_name=args.wandb_name,
         accumulate_grad_batches=args.grad_accu_steps,
         strategy=args.strategy,
         precision=args.precision,
