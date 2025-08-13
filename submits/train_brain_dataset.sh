@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_dataset
-#SBATCH --output=./slurmlogs/outputs/train_brain_dataset_%j_%t.out  # <-- CHANGED
-#SBATCH --error=./slurmlogs/errors/train_brain_dataset_%j_%t.err   # <-- CHANGED
+#SBATCH --output=./slurmlogs/outputs/train_brain_dataset_%j_%t.out
+#SBATCH --error=./slurmlogs/errors/train_brain_dataset_%j_%t.err
 #SBATCH --time=12:00:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=4
@@ -11,7 +11,7 @@
 mkdir -p ./slurmlogs/outputs
 mkdir -p ./slurmlogs/errors
 
-singularity run \
+srun singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
