@@ -5,7 +5,6 @@
 #SBATCH --tasks=4
 #SBATCH --cpus-per-task=15
 #SBATCH --gpus-per-task=1
-#SBATCH --gres=gpu:rtx4090:4
 
 mkdir -p ./slurmlogs/outputs
 mkdir -p ./slurmlogs/errors
