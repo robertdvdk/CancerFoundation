@@ -3,6 +3,10 @@
 #SBATCH --output=./slurmlogs/outputs/create_dataset_%j.out
 #SBATCH --error=./slurmlogs/errors/create_dataset_%j.err
 #SBATCH --time=00:05:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:rtx4090:1
+#SBATCH --tasks=1
+#SBATCH --cpus-per-task=15
 
 singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
