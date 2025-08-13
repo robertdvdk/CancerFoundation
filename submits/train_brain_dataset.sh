@@ -8,6 +8,9 @@
 #SBATCH --cpus-per-task=60
 #SBATCH --gres=gpu:rtx4090:4
 
+mkdir -p ./slurmlogs/outputs
+mkdir -p ./slurmlogs/errors
+
 singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
