@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_compile
+#SBATCH --job-name=train_brain_nocompile
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:10:00
+#SBATCH --time=06:00:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-task=1
@@ -27,7 +27,7 @@ srun singularity run \
     --nheads 8 \
     --embsize 128 \
     --d-hi 256 \
-    --epochs 1 \
+    --epochs 50 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --val-check-interval 0.5 \
@@ -38,7 +38,6 @@ srun singularity run \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
     --seed 0 \
-    --compile \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 
