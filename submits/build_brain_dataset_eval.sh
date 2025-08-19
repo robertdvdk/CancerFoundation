@@ -1,8 +1,8 @@
 #!/bin/bash -l
-#SBATCH --job-name=create_dataset_train
+#SBATCH --job-name=create_dataset_eval
 #SBATCH --output=./slurmlogs/outputs/create_dataset_%j.out
 #SBATCH --error=./slurmlogs/errors/create_dataset_%j.err
-#SBATCH --time=00:05:00
+#SBATCH --time=00:30:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:rtx4090:1
 #SBATCH --tasks=1
@@ -14,6 +14,6 @@ singularity run \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python ./scripts/h5ads_to_sc.py \
-    --h5ad-path /cluster/dataset/boeva/rvander/DATA/raw_data/eval \
-    --vocab-path /cluster/dataset/boeva/rvander/DATA/processed_data/train/vocab.json \
-    --data-path /cluster/dataset/boeva/rvander/DATA/processed_data/eval
+    --h5ad-path /cluster/dataset/boeva/rvander/DATA/medium/raw_data/eval \
+    --vocab-path /cluster/dataset/boeva/rvander/DATA/medium/processed_data/train/vocab.json \
+    --data-path /cluster/dataset/boeva/rvander/DATA/medium/processed_data/eval
