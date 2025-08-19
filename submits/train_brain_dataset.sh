@@ -1,13 +1,5 @@
 #!/bin/bash -l
-<<<<<<< HEAD
-<<<<<<< HEAD
-#SBATCH --job-name=train_brain_compile
-=======
 #SBATCH --job-name=train_brain_dataset
->>>>>>> e354f697d7b0ca8e008961d10e3e6f7bdf4280e6
-=======
-#SBATCH --job-name=train_brain_compile
->>>>>>> refs/remotes/origin/lightning
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=00:10:00
 #SBATCH --partition=gpu
@@ -18,6 +10,7 @@
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 
@@ -42,7 +35,7 @@ srun singularity run \
     --trunc-by-sample \
     --loss mse \
     --balance-primary technology \
-    --train-path /cluster/dataset/boeva/rvander/DATA/processed_data/train \
+    --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
     --seed 0 \
@@ -50,23 +43,11 @@ srun singularity run \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> refs/remotes/origin/lightning
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
 fi
 
-<<<<<<< HEAD
+cp "./$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
 mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"
-=======
-mv ./lightning_logs/version_"${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
-=======
->>>>>>> refs/remotes/origin/lightning
-cp "$0" "$SAVE_DIR/run_script.sh"
-mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
-echo "Job finished. Outputs and logs are in $SAVE_DIR"
->>>>>>> e354f697d7b0ca8e008961d10e3e6f7bdf4280e6

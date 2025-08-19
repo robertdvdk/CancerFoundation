@@ -10,6 +10,7 @@
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 
@@ -34,7 +35,7 @@ srun singularity run \
     --trunc-by-sample \
     --loss mse \
     --balance-primary technology \
-    --train-path /cluster/dataset/boeva/rvander/DATA/processed_data/train \
+    --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
     --seed 0 \
@@ -45,6 +46,7 @@ if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
 fi
 
+cp "./$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
 mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"

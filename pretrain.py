@@ -69,14 +69,7 @@ def train_model(
             entity=wandb_entity,
             project=wandb_project,
             name=wandb_name,
-<<<<<<< HEAD
-<<<<<<< HEAD
             save_dir=save_dir,
-=======
->>>>>>> e354f697d7b0ca8e008961d10e3e6f7bdf4280e6
-=======
-            save_dir=save_dir,
->>>>>>> refs/remotes/origin/lightning
         )
 
     # Create trainer
