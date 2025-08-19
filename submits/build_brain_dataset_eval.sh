@@ -1,11 +1,10 @@
 #!/bin/bash -l
 #SBATCH --job-name=create_dataset_eval
-#SBATCH --output=./slurmlogs/outputs/create_dataset_%j.out
-#SBATCH --error=./slurmlogs/errors/create_dataset_%j.err
+#SBATCH --output=./%x_%j.out
 #SBATCH --time=00:30:00
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:rtx4090:1
-#SBATCH --tasks=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=15
 
 singularity run \
