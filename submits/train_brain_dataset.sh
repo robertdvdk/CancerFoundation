@@ -1,5 +1,9 @@
 #!/bin/bash -l
+<<<<<<< HEAD
 #SBATCH --job-name=train_brain_compile
+=======
+#SBATCH --job-name=train_brain_dataset
+>>>>>>> e354f697d7b0ca8e008961d10e3e6f7bdf4280e6
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=00:10:00
 #SBATCH --partition=gpu
@@ -42,6 +46,7 @@ srun singularity run \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 
+<<<<<<< HEAD
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
 fi
@@ -49,3 +54,9 @@ fi
 cp "$0" "$SAVE_DIR/run_script.sh"
 mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"
+=======
+mv ./lightning_logs/version_"${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
+cp "$0" "$SAVE_DIR/run_script.sh"
+mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
+echo "Job finished. Outputs and logs are in $SAVE_DIR"
+>>>>>>> e354f697d7b0ca8e008961d10e3e6f7bdf4280e6
