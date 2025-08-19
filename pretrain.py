@@ -69,6 +69,7 @@ def train_model(
             entity=wandb_entity,
             project=wandb_project,
             name=wandb_name,
+            save_dir=save_dir,
         )
 
     # Create trainer
