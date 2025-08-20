@@ -10,7 +10,7 @@
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/brain/processed_data2/train"
+TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/brain/processed_data_2/train"
 mkdir -p "$SAVE_DIR"
 
 srun singularity run \
