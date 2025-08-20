@@ -16,7 +16,7 @@ mkdir -p "$SAVE_DIR"
 srun singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
-    --bind /cluster/dataset/boeva/atheus/CancerFoundation/pretraining_data:/cluster/dataset/boeva/atheus/CancerFoundation/pretraining_data \
+    --bind /cluster/work/boeva/atheus/CancerFoundation/pretraining_data:/cluster/work/boeva/atheus/CancerFoundation/pretraining_data \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
     --gpus 1 \
