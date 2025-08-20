@@ -13,5 +13,5 @@ singularity run \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python ./scripts/h5ads_to_sc.py \
-    --h5ad-path /cluster/dataset/boeva/rvander/DATA/brain/raw_data/train \
-    --data-path /cluster/dataset/boeva/rvander/DATA/brain/processed_data_2/train
+    --h5ad-path /cluster/dataset/boeva/rvander/DATA/brain2/raw_data/train \
+    --data-path /cluster/dataset/boeva/rvander/DATA/brain2/processed_data/train
