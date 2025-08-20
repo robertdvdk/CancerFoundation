@@ -62,31 +62,27 @@ def _add_gene_id_to_h5ads(h5ads: Path, vocab: dict[str, int], data_path: Path) -
         print(f"Processing and aligning {path.name}...")
         adata = sc.read_h5ad(path)
 
-        # 1. Build target AnnData with all genes
         final_var = pd.DataFrame(index=all_genes_in_vocab)
-        final_X = scipy.sparse.csc_matrix(
-            (adata.n_obs, len(all_genes_in_vocab)),
-            dtype=getattr(adata.X, "dtype", float),
-        )
-        final_adata = anndata.AnnData(X=final_X, obs=adata.obs.copy(), var=final_var)
 
-        # 2. Align by indices (avoid name-based slice assignment on sparse views)
+        # --- FIX 1: Create as a csr_matrix to satisfy AnnData's requirements ---
+        final_X = scipy.sparse.csr_matrix(
+            (adata.n_obs, len(all_genes_in_vocab)), dtype=adata.X.dtype
+        )
+        # This will no longer produce a warning
+        final_adata = anndata.AnnData(X=final_X, obs=adata.obs, var=final_var)
+
         common_genes = adata.var_names.intersection(all_genes_in_vocab)
 
-        # Source and destination integer column indices
-        src_idx = adata.var_names.get_indexer(common_genes)
-        dest_idx = final_adata.var_names.get_indexer(common_genes)
+        # --- FIX 2: Temporarily convert to LIL for the assignment, then convert back ---
+        # Convert to LIL format for efficient modification
+        final_adata.X = final_adata.X.tolil()
 
-        # 3. Do the assignment in CSC (efficient for column writes), then go back to CSR
-        X_src = adata.X[:, src_idx]
-        if not scipy.sparse.issparse(X_src):
-            X_src = scipy.sparse.csc_matrix(X_src)
+        # Perform the efficient assignment
+        final_adata[:, common_genes].X = adata[:, common_genes].X
 
-        X_dst = final_adata.X  # CSC
-        X_dst[:, dest_idx] = X_src
-        final_adata.X = X_dst.tocsr()
+        # Convert back to CSR for efficient storage and downstream use
+        final_adata.X = final_adata.X.tocsr()
 
-        # 4. Map gene names to IDs and save
         final_adata.var[GENE_ID] = final_adata.var_names.map(vocab).astype(int)
         final_adata.write_h5ad(output_h5ads_dir / path.name)
 
