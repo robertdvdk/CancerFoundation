@@ -67,9 +67,7 @@ class SingleCellDataset(Dataset):
     ):
         super().__init__()
         self.data_dir = DatasetDir(data_dir)
-        print(self.data_dir)
         self.vocab = self._load_vocab()
-        print(self.vocab)
         self.pad_value = pad_value
         self.memmap = SingleCellMemMapDataset(self.data_dir.memmap_path)
         self.obs = pd.read_parquet(self.data_dir.obs_path)

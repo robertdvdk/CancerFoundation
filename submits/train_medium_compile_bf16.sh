@@ -14,7 +14,7 @@ TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/medium/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 
-srun singularity run \
+singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
@@ -23,7 +23,7 @@ srun singularity run \
     --gpus 1 \
     --save-dir "QQq" \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 8 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 256 \
@@ -36,13 +36,10 @@ srun singularity run \
     --loss mse \
     --balance-primary tissue \
     --balance-secondary technology \
-    --train-path "/cluster/dataset/boeva/rvander/DATA/medium/processed_data/train" \
+    --train-path "./DATA/medium/processed_data/train" \
     --zero-percentages 0.2 0.4 0.6 \
-    --strategy='ddp' \
-    --seed 0 \
-    --wandb "brain" \
-    --wandb-name "QQq" \
-    --compile
+    --strategy='auto' \
+    --seed 1
 
 
 srun singularity run \

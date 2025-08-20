@@ -10,6 +10,8 @@ from bionemo.scdl.io.single_cell_collection import SingleCellCollection
 import scanpy as sc
 import pandas as pd
 import json
+import scipy.sparse
+import anndata
 
 
 GENE_ID = "_cf_gene_id"
@@ -44,15 +46,43 @@ def _save_vocab_to_dir(vocab: dict[str, int], data_dir: DatasetDir) -> None:
 
 
 def _add_gene_id_to_h5ads(h5ads: Path, vocab: dict[str, int], data_path: Path) -> None:
-    (data_path / "h5ads").mkdir()
+    # Create the output directory for the new, consistent h5ad files
+    output_h5ads_dir = data_path / "h5ads"
+    output_h5ads_dir.mkdir(exist_ok=True, parents=True)
+
+    # Create a list of all gene names from the vocab, excluding special tokens
+    all_genes_in_vocab = [
+        gene for gene in vocab.keys() if gene not in [CLS_TOKEN, PAD_TOKEN]
+    ]
+
     for path in h5ads.iterdir():
         if not path.name.endswith(".h5ad"):
             continue
+
+        print(f"Processing and aligning {path.name}...")
         adata = sc.read_h5ad(path)
-        adata.var[GENE_ID] = adata.var_names.map(vocab)
-        adata = adata[:, ~adata.var[GENE_ID].isna()].copy()
-        adata.var[GENE_ID] = adata.var[GENE_ID].astype(int)
-        adata.write_h5ad(data_path / "h5ads" / path.name)
+
+        # 1. Create a new, blank AnnData object. It has the same cells (observations)
+        #    as the original file, but its variables are the complete set of genes
+        #    from the global vocabulary. The expression matrix is initialized with zeros.
+        final_var = pd.DataFrame(index=all_genes_in_vocab)
+        final_X = scipy.sparse.csr_matrix(
+            (adata.n_obs, len(all_genes_in_vocab)), dtype=adata.X.dtype
+        )
+        final_adata = anndata.AnnData(X=final_X, obs=adata.obs, var=final_var)
+
+        # 2. Find the genes that are common between the original file and the global vocabulary.
+        common_genes = adata.var_names.intersection(all_genes_in_vocab)
+
+        # 3. Copy the expression data for these common genes from the original object
+        #    into the correct columns of our new, full-sized object.
+        final_adata[:, common_genes].X = adata[:, common_genes].X
+
+        # 4. Now that the object is consistent, map the gene names to their integer IDs.
+        final_adata.var[GENE_ID] = final_adata.var_names.map(vocab).astype(int)
+
+        # 5. Save the new, consistent file.
+        final_adata.write_h5ad(output_h5ads_dir / path.name)
 
 
 def convert_columns_to_categorical_with_mapping(df):
