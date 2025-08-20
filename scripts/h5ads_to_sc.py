@@ -82,8 +82,8 @@ def main():
 
     h5ad_path = args.h5ad_path
     # columns = ['sample', 'disease', 'technology', 'tissue', "suspension", "project_id"]
-    # columns = ['sample', 'cancer_type', 'technology', 'tissue']
-    columns = ["sample", "cancer_type", "technology"]  # if only brain cancer
+    columns = ["sample", "cancer_type", "technology", "tissue"]
+    # columns = ["sample", "cancer_type", "technology"]  # if only brain cancer
 
     data_path = DatasetDir(args.data_path)
     data_path.mkdir()
@@ -104,6 +104,7 @@ def main():
     obs_list = []
     for fname in memmaps.fname_to_mmap.keys():
         adata = sc.read_h5ad(h5ad_path / (fname.name + ".h5ad"), backed="r")
+        print(adata.obs.keys())
         obs_list.append(adata.obs[columns])
 
     obs = pd.concat(obs_list)

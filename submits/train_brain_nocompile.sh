@@ -10,7 +10,7 @@
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/processed_data/train"
+TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/small/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 
