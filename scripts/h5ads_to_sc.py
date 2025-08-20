@@ -100,7 +100,8 @@ def main():
 
     # Collect observations
     obs_list = []
-    for fname in memmaps.fname_to_mmap.keys():
+    for i, fname in enumerate(memmaps.fname_to_mmap.keys()):
+        print(f"Processing {i + 1}/{len(memmaps.fname_to_mmap)}: {fname.name}")
         adata = sc.read_h5ad(h5ad_path / (fname.name + ".h5ad"), backed="r")
 
         # Extract tissue name from the filename (e.g., '..._kidney' -> 'kidney')
@@ -122,6 +123,8 @@ def main():
 
     # Flatten and create memmap dataset
     memmaps.flatten(data_path.memmap_path, destroy_on_copy=True)
+
+    print("Conversion completed successfully.")
 
 
 if __name__ == "__main__":
