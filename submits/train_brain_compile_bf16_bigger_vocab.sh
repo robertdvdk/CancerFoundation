@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_compile_bf16
+#SBATCH --job-name=train_brain_compile_bf16_bigger_vocab
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=12:00:00
 #SBATCH --partition=gpu
@@ -10,7 +10,7 @@
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/brain/processed_data/train"
+TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/brain2/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 srun singularity run \
