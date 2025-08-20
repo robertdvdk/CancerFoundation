@@ -1,10 +1,10 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_nocompile
+#SBATCH --job-name=train_brain_compile_bf16
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=06:00:00
 #SBATCH --partition=gpu
-#SBATCH --ntasks-per-node=4
-#SBATCH --gpus-per-task=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
 
 set -e
@@ -13,17 +13,16 @@ SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/small/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
-
 srun singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
-    --gpus 4 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 64 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
@@ -39,8 +38,10 @@ srun singularity run \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
     --seed 0 \
+    --compile \
     --wandb "brain" \
-    --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+    --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
+    --precision "bf16-mixed"
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"

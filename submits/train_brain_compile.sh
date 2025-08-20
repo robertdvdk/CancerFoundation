@@ -47,7 +47,7 @@ if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
 fi
 
-cp "./$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
+cp "$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
-mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
+mv "./${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"

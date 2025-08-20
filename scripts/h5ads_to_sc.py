@@ -81,9 +81,7 @@ def main():
     args = get_args()
 
     h5ad_path = args.h5ad_path
-    # columns = ['sample', 'disease', 'technology', 'tissue', "suspension", "project_id"]
     columns = ["sample", "cancer_type", "technology", "tissue"]
-    # columns = ["sample", "cancer_type", "technology"]  # if only brain cancer
 
     data_path = DatasetDir(args.data_path)
     data_path.mkdir()

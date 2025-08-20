@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_medium_compile
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=24:00:00
+#SBATCH --time=00:15:00
 #SBATCH --partition=gpu
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=15
 
@@ -20,7 +20,7 @@ srun singularity run \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
-    --gpus 4 \
+    --gpus 1 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 32 \
@@ -40,7 +40,6 @@ srun singularity run \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
     --seed 0 \
-    --compile \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 
@@ -48,7 +47,7 @@ if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
 fi
 
-cp "./$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
+cp "$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
-mv ./"${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
+mv "./${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"
