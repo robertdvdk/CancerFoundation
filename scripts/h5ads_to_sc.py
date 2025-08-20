@@ -105,15 +105,11 @@ def main():
     for fname in memmaps.fname_to_mmap.keys():
         adata = sc.read_h5ad(h5ad_path / (fname.name + ".h5ad"), backed="r")
 
-        # ---- MODIFICATION START ----
         # Extract tissue name from the filename (e.g., '..._kidney' -> 'kidney')
-        tissue_name = fname.name.split("_")[-1]
+        tissue_name = fname.name.split("_")[1]
 
         # Create the 'tissue' column and assign the extracted name to all cells
         adata.obs["tissue"] = tissue_name
-
-        print(f"Processed {fname.name}, added tissue: '{tissue_name}'")
-        # ---- MODIFICATION END ----
 
         obs_list.append(adata.obs[columns])
 
