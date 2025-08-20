@@ -16,7 +16,7 @@ mkdir -p "$SAVE_DIR"
 srun singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
-    --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
+    --bind /cluster/dataset/boeva/atheus/CancerFoundation/pretraining_data:/cluster/dataset/boeva/atheus/CancerFoundation/pretraining_data \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
     --gpus 1 \
@@ -37,7 +37,7 @@ srun singularity run \
     --balance-secondary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
-    --strategy='ddp' \
+    --strategy='auto' \
     --seed 0 \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
