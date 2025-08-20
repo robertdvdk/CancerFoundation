@@ -29,7 +29,7 @@ srun singularity run \
     --embsize 256 \
     --d-hi 512 \
     --epochs 15 \
-    --lr 0.0001 \  
+    --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --val-check-interval 0.5 \
     --trunc-by-sample \
