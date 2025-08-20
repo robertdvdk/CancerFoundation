@@ -62,30 +62,32 @@ def _add_gene_id_to_h5ads(h5ads: Path, vocab: dict[str, int], data_path: Path) -
         print(f"Processing and aligning {path.name}...")
         adata = sc.read_h5ad(path)
 
-        # 1. Create a new, blank AnnData object. It has the same cells (observations)
-        # as the original file, but its variables are the complete set of genes
-        # from the global vocabulary. The expression matrix is initialized with zeros.
+        # 1. Build target AnnData with all genes
         final_var = pd.DataFrame(index=all_genes_in_vocab)
-
-        # --- FIX: Create as a lil_matrix for efficient item assignment ---
-        final_X = scipy.sparse.lil_matrix(
-            (adata.n_obs, len(all_genes_in_vocab)), dtype=adata.X.dtype
+        final_X = scipy.sparse.csc_matrix(
+            (adata.n_obs, len(all_genes_in_vocab)),
+            dtype=getattr(adata.X, "dtype", float),
         )
-        final_adata = anndata.AnnData(X=final_X, obs=adata.obs, var=final_var)
+        final_adata = anndata.AnnData(X=final_X, obs=adata.obs.copy(), var=final_var)
 
-        # 2. Find the genes that are common between the original file and the global vocabulary.
+        # 2. Align by indices (avoid name-based slice assignment on sparse views)
         common_genes = adata.var_names.intersection(all_genes_in_vocab)
 
-        # 3. Copy the expression data. This is now efficient because final_adata.X is a lil_matrix.
-        final_adata[:, common_genes].X = adata[:, common_genes].X
+        # Source and destination integer column indices
+        src_idx = adata.var_names.get_indexer(common_genes)
+        dest_idx = final_adata.var_names.get_indexer(common_genes)
 
-        # --- FIX: Convert back to csr_matrix for efficient storage and downstream use ---
-        final_adata.X = final_adata.X.tocsr()
+        # 3. Do the assignment in CSC (efficient for column writes), then go back to CSR
+        X_src = adata.X[:, src_idx]
+        if not scipy.sparse.issparse(X_src):
+            X_src = scipy.sparse.csc_matrix(X_src)
 
-        # 4. Now that the object is consistent, map the gene names to their integer IDs.
+        X_dst = final_adata.X  # CSC
+        X_dst[:, dest_idx] = X_src
+        final_adata.X = X_dst.tocsr()
+
+        # 4. Map gene names to IDs and save
         final_adata.var[GENE_ID] = final_adata.var_names.map(vocab).astype(int)
-
-        # 5. Save the new, consistent file.
         final_adata.write_h5ad(output_h5ads_dir / path.name)
 
 
