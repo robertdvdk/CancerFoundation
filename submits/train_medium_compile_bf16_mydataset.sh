@@ -1,16 +1,16 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_medium_compile_bf16
+#SBATCH --job-name=train_medium_compile_bf16_mydataset_default
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=13:00:00
 #SBATCH --partition=gpu
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:rtx4090:1
+#SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
 
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/medium/processed_data/train"
+TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/medium/processed_data_default/train"
 mkdir -p "$SAVE_DIR"
 
 srun singularity run \
@@ -19,10 +19,10 @@ srun singularity run \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
-    --gpus 1 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 64 \
+    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 256 \
