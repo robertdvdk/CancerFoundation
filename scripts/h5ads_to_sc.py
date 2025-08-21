@@ -22,6 +22,7 @@ def get_args():
     parser.add_argument("--h5ad-path", type=Path)
     parser.add_argument("--data-path", type=Path)
     parser.add_argument("--vocab-path", type=Path, required=False)
+    parser.add_argument("--merge_tech", type=str, default="default")
     return parser.parse_args()
 
 
@@ -77,6 +78,74 @@ def convert_columns_to_categorical_with_mapping(df):
     return df_categorical, category_mappings
 
 
+def get_tech_map(level: str = "default") -> dict:
+    """
+    Return a technology mapping dictionary.
+
+    Args:
+        level (str): one of {"default", "medium", "coarse"}.
+            - "default": leaves everything as-is (identity mapping).
+            - "medium": merges only closely related protocols.
+            - "coarse": collapses into broad technology families.
+
+    Returns:
+        dict: mapping from original technology name -> merged category
+    """
+    if level == "coarse":
+        return {
+            # droplet-based 3′ UMI
+            "10X": "10x-like",
+            "10x": "10x-like",
+            "Drop-seq": "10x-like",
+            "inDrop": "10x-like",
+            # microwell / nanowell
+            "SeqWell": "microwell-like",
+            "Seq-Well": "microwell-like",
+            "Seq-Well S3": "microwell-like",
+            "Microwell-seq": "microwell-like",
+            "Microwell array-based platform": "microwell-like",
+            # plate-based 3′ UMI
+            "CEL-seq2": "plate-like",
+            "MARS-seq": "plate-like",
+            # keep separate
+            "SmartSeq2": "SmartSeq2",
+            "iCell8": "iCell8",
+            "Nanogrid": "Nanogrid",
+            "HiSeq 2000": "HiSeq 2000",
+        }
+
+    elif level == "medium":
+        return {
+            # droplet-based 3′ UMI
+            "10X": "10x-like",
+            "10x": "10x-like",
+            "Drop-seq": "Drop-seq",
+            "inDrop": "inDrop",
+            # microwell / nanowell
+            "SeqWell": "SeqWell",
+            "Seq-Well": "SeqWell",
+            "Seq-Well S3": "SeqWell",
+            "Microwell-seq": "Microwell",
+            "Microwell array-based platform": "Microwell",
+            # plate-based 3′ UMI
+            "CEL-seq2": "CEL-seq2",
+            "MARS-seq": "MARS-seq",
+            # keep separate
+            "SmartSeq2": "SmartSeq2",
+            "iCell8": "iCell8",
+            "Nanogrid": "Nanogrid",
+            "HiSeq 2000": "HiSeq 2000",
+        }
+
+    elif level == "default":
+        # identity mapping: return an empty dict,
+        # so .map() leaves values unchanged
+        return {}
+
+    else:
+        raise ValueError("level must be one of {'default', 'medium', 'coarse'}")
+
+
 def main():
     args = get_args()
 
@@ -113,6 +182,9 @@ def main():
         obs_list.append(adata.obs[columns])
 
     obs = pd.concat(obs_list)
+
+    tech_map = get_tech_map()  # Change level as needed
+    obs["technology"] = obs["technology"].map(tech_map)
 
     obs, mapping = convert_columns_to_categorical_with_mapping(obs)
 

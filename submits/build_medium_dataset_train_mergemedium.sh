@@ -14,5 +14,5 @@ singularity run \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python ./scripts/h5ads_to_sc.py \
     --h5ad-path /cluster/dataset/boeva/rvander/DATA/medium/raw_data/train \
-    --data-path /cluster/dataset/boeva/rvander/DATA/medium/processed_data_default/train \
-    --merge_tech default
+    --data-path /cluster/dataset/boeva/rvander/DATA/medium/processed_data_medium/train \
+    --merge_tech medium
