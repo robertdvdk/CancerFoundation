@@ -1,10 +1,10 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_medium_compile_bf16_atheusdataset
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --partition=gpu
-#SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:rtx4090:4
+#SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
 
 set -e
@@ -19,7 +19,7 @@ srun singularity run \
     --bind /cluster/work/boeva/atheus/CancerFoundation/pretraining_data:/cluster/work/boeva/atheus/CancerFoundation/pretraining_data \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
-    --gpus 4 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 32 \
