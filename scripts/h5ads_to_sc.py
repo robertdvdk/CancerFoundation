@@ -183,8 +183,10 @@ def main():
 
     obs = pd.concat(obs_list)
 
-    tech_map = get_tech_map()  # Change level as needed
-    obs["technology"] = obs["technology"].map(tech_map)
+    tech_map = get_tech_map(args.merge_tech)  # Change level as needed
+    obs["technology"] = obs["technology"].map(tech_map).fillna(obs["technology"])
+
+    print(obs.technology.unique())
 
     obs, mapping = convert_columns_to_categorical_with_mapping(obs)
 
