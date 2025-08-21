@@ -52,7 +52,5 @@ accelerate launch --config-file="./config.yaml" \
     --trunc-by-sample \
     --loss "mse" \
     --vocab $VOCAB_PATH \
-    --train-path "../CancerFoundation_training_bionemo_2/data" \
-    --eval-path "../CancerFoundation_training_bionemo_2/data" \
+    --train-path "./DATA/test/processed_data/train" \
     --zero-percentages 0.2 0.4 0.6
-

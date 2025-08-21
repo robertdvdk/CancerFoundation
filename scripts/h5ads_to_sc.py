@@ -10,9 +10,7 @@ from bionemo.scdl.io.single_cell_collection import SingleCellCollection
 import scanpy as sc
 import pandas as pd
 import json
-import scipy.sparse
-import anndata
-
+import os
 
 GENE_ID = "_cf_gene_id"
 CLS_TOKEN = "<cls>"
@@ -46,45 +44,15 @@ def _save_vocab_to_dir(vocab: dict[str, int], data_dir: DatasetDir) -> None:
 
 
 def _add_gene_id_to_h5ads(h5ads: Path, vocab: dict[str, int], data_path: Path) -> None:
-    # Create the output directory for the new, consistent h5ad files
-    output_h5ads_dir = data_path / "h5ads"
-    output_h5ads_dir.mkdir(exist_ok=True, parents=True)
-
-    # Create a list of all gene names from the vocab, excluding special tokens
-    all_genes_in_vocab = [
-        gene for gene in vocab.keys() if gene not in [CLS_TOKEN, PAD_TOKEN]
-    ]
-
+    (data_path / "h5ads").mkdir()
     for path in h5ads.iterdir():
         if not path.name.endswith(".h5ad"):
             continue
-
-        print(f"Processing and aligning {path.name}...")
         adata = sc.read_h5ad(path)
-
-        final_var = pd.DataFrame(index=all_genes_in_vocab)
-
-        # --- FIX 1: Create as a csr_matrix to satisfy AnnData's requirements ---
-        final_X = scipy.sparse.csr_matrix(
-            (adata.n_obs, len(all_genes_in_vocab)), dtype=adata.X.dtype
-        )
-        # This will no longer produce a warning
-        final_adata = anndata.AnnData(X=final_X, obs=adata.obs, var=final_var)
-
-        common_genes = adata.var_names.intersection(all_genes_in_vocab)
-
-        # --- FIX 2: Temporarily convert to LIL for the assignment, then convert back ---
-        # Convert to LIL format for efficient modification
-        final_adata.X = final_adata.X.tolil()
-
-        # Perform the efficient assignment
-        final_adata[:, common_genes].X = adata[:, common_genes].X
-
-        # Convert back to CSR for efficient storage and downstream use
-        final_adata.X = final_adata.X.tocsr()
-
-        final_adata.var[GENE_ID] = final_adata.var_names.map(vocab).astype(int)
-        final_adata.write_h5ad(output_h5ads_dir / path.name)
+        adata.var[GENE_ID] = adata.var_names.map(vocab)
+        adata = adata[:, ~adata.var[GENE_ID].isna()].copy()
+        adata.var[GENE_ID] = adata.var[GENE_ID].astype(int)
+        adata.write_h5ad(data_path / "h5ads" / path.name)
 
 
 def convert_columns_to_categorical_with_mapping(df):
@@ -157,6 +125,9 @@ def main():
     memmaps.flatten(data_path.memmap_path, destroy_on_copy=True)
 
     print("Conversion completed successfully.")
+
+    # Remove duplicate metadata file that causes issues
+    os.remove(data_path.memmap_path / "features/dataframe_00.parquet")
 
 
 if __name__ == "__main__":

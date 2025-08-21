@@ -12,7 +12,7 @@ python pretrain.py \
     --warmup-ratio-or-step 10000 \
     --trunc-by-sample \
     --loss "mse" \
-    --train-path "./debug_data" \
+    --train-path "./DATA/test/processed_data/train" \
     --zero-percentages 0.2 0.4 0.6 \
     --conditions "technology" \
     --balance-primary "tissue" \
