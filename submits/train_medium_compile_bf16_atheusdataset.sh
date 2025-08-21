@@ -1,10 +1,10 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_medium_compile_bf16_atheusdataset
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=06:00:00
 #SBATCH --partition=gpu
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:rtx4090:1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:rtx4090:4
 #SBATCH --cpus-per-task=15
 
 set -e
@@ -19,10 +19,10 @@ srun singularity run \
     --bind /cluster/work/boeva/atheus/CancerFoundation/pretraining_data:/cluster/work/boeva/atheus/CancerFoundation/pretraining_data \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
-    --gpus 1 \
+    --gpus 4 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 64 \
+    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 256 \
@@ -37,7 +37,7 @@ srun singularity run \
     --balance-secondary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
-    --strategy='auto' \
+    --strategy='ddp' \
     --seed 0 \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
