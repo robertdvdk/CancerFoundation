@@ -103,7 +103,9 @@ class SingleCellDataModule(pl.LightningDataModule):
             self.conditions_nums = {}
             for cond in self.conditions:
                 self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
-                print(f"Condition {cond} has {self.conditions_nums[cond]} categories.")
+                print(
+                    f"Condition {cond} has {self.conditions_nums[cond]} categories: {self.dataset.mapping[cond].keys()}"
+                )
 
         # Create train/validation split
         self.train_dataset, self.val_dataset = random_split(

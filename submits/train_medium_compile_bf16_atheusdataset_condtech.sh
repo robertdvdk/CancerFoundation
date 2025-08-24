@@ -13,6 +13,36 @@ SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/cluster/work/boeva/atheus/CancerFoundation/pretraining_data/cancer_gpt"
 mkdir -p "$SAVE_DIR"
 
+
+singularity run \
+    --pwd /cluster/work/boeva/rvander/CancerFoundation \
+    --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
+    --bind /cluster/work/boeva/atheus/CancerFoundation/pretraining_data:/cluster/work/boeva/atheus/CancerFoundation/pretraining_data \
+    --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
+    python pretrain.py \
+    --gpus 2 \
+    --save-dir "./save/QQQQq" \
+    --max-seq-len 1200 \
+    --batch-size 32 \
+    --nlayers 6 \
+    --nheads 8 \
+    --embsize 256 \
+    --d-hi 512 \
+    --epochs 15 \
+    --lr 0.0001 \
+    --warmup-ratio-or-step 10000 \
+    --val-check-interval 0.5 \
+    --trunc-by-sample \
+    --loss mse \
+    --conditions technology \
+    --balance-primary tissue \
+    --balance-secondary technology \
+    --train-path "/cluster/work/boeva/atheus/CancerFoundation/pretraining_data/cancer_gpt" \
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp' \
+    --seed 0 \
+    --precision "bf16-mixed"
+    
 srun singularity run \
     --pwd /cluster/work/boeva/rvander/CancerFoundation \
     --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
