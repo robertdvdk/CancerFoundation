@@ -1,27 +1,17 @@
 import pytorch_lightning as pl
-from collections import defaultdict
-from pathlib import Path
 import os
-from typing import Dict, List, Optional, Union, Dict
-from typing import Iterator, Optional
+from typing import Optional, Dict
+from typing import Iterator
 from operator import itemgetter
 from .data_sampler import get_balanced_sampler
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, random_split
 
 from .data_collator import AnnDataCollator
 from .dataset import SingleCellDataset
-from torch.utils.data import (
-    Dataset,
-    Sampler,
-    DistributedSampler,
-    WeightedRandomSampler
-)
-import numpy as np
-
+from torch.utils.data import Dataset, Sampler, DistributedSampler
 
 
 class DatasetFromSampler(Dataset):
-
     def __init__(self, sampler: Sampler):
         self.sampler = sampler
         self.sampler_list = None
@@ -36,7 +26,7 @@ class DatasetFromSampler(Dataset):
 
 
 class DistributedSamplerWrapper(DistributedSampler):
-    """ Convert any Pytorch Sampler to a DistributedSampler """
+    """Convert any Pytorch Sampler to a DistributedSampler"""
 
     def __init__(
         self,
@@ -90,8 +80,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         self.training_tasks = training_tasks
         self.n_bins = n_bins
         self.zero_percentages = zero_percentages
-        
-        
+
         # Setup token values based on embedding style
         if self.input_style == "category":
             self.mask_value = self.n_bins + 1
@@ -101,25 +90,27 @@ class SingleCellDataModule(pl.LightningDataModule):
             self.mask_value = -1
             self.pad_value = -2
             self.n_input_bins = self.n_bins
-        
 
     def setup(self, stage: str):
         """Initialize dataset and create train/validation splits"""
         self.dataset = SingleCellDataset(
             data_dir=self.data_path,
             pad_value=self.pad_value,
-            obs_columns=self.conditions
+            obs_columns=self.conditions,
         )
-        
+
         if self.conditions:
             self.conditions_nums = {}
             for cond in self.conditions:
                 self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
-        
+                print(f"Condition {cond} has {self.conditions_nums[cond]} categories.")
+
         # Create train/validation split
-        self.train_dataset, self.val_dataset = random_split(self.dataset, [1-0.05, 0.05])
+        self.train_dataset, self.val_dataset = random_split(
+            self.dataset, [1 - 0.05, 0.05]
+        )
         self.vocab = self.dataset.vocab
-        
+
         self.pad_token_id = self.vocab["<pad>"]
         self.cls_token_id = self.vocab["<cls>"]
 
@@ -128,23 +119,23 @@ class SingleCellDataModule(pl.LightningDataModule):
         # Setup sampler
         if self.balance_primary and train:
             sampler = get_balanced_sampler(
-                dataset, 
-                primary_condition=self.balance_primary, 
-                secondary_condition=self.balance_secondary, 
-                oversample=True
+                dataset,
+                primary_condition=self.balance_primary,
+                secondary_condition=self.balance_secondary,
+                oversample=True,
             )
         else:
             sampler = RandomSampler(dataset) if train else SequentialSampler(dataset)
 
-        
         if self.trainer.world_size > 1:
             print(f"Rank: {self.trainer.global_rank} init DistributedSampler.")
             sampler = DistributedSamplerWrapper(
                 sampler,
                 num_replicas=self.trainer.world_size,
                 rank=self.trainer.global_rank,
-                shuffle=train)
-        
+                shuffle=train,
+            )
+
         # Setup collator
         collator = AnnDataCollator(
             do_padding=self.max_seq_len is not None,
@@ -165,7 +156,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         batch_size = self.batch_size if train else self.batch_size
         if train:
             num_workers = min(12, min(len(os.sched_getaffinity(0)), self.batch_size))
-        else: 
+        else:
             num_workers = 12
         print(f"Using {num_workers} workers.")
         return DataLoader(
