@@ -142,7 +142,7 @@ class SingleCellDataModule(pl.LightningDataModule):
             pad_value=self.pad_value,
             do_mlm=True,
             do_binning=self.input_style == "binned",
-            mlm_probability=self.mask_ratio,
+            mask_ratio=self.mask_ratio,
             mask_value=self.mask_value,
             max_length=self.max_seq_len,
             sampling=self.TRUNC_BY_SAMPLE,

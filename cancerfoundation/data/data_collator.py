@@ -20,7 +20,7 @@ class AnnDataCollator:
             values to the max length.
         do_mlm (:obj:`bool`): whether to do masking with MLM.
         do_binning (:obj:`bool`): whether to bin the expression values.
-        mlm_probability (:obj:`float`): the probability of masking with MLM.
+        mask_ratio (:obj:`float`): the probability of masking with MLM.
         mask_value (:obj:`int`): the value to fill at the expression postions
             that are masked.
         max_length (:obj:`int`, optional): the maximum length of the sequences.
@@ -40,6 +40,7 @@ class AnnDataCollator:
             training setting. If "both", the output will contain both fields above.
             Choices: "pcpt", "gen", "both". Default to "pcpt".
     """
+
     do_padding: bool = True
     gene_key: str = "var_gene_token"
     pad_token_id: Optional[int] = None
@@ -47,7 +48,7 @@ class AnnDataCollator:
     do_mlm: bool = True
     do_binning: bool = True
     probabilistic_augmentation: bool = False
-    mlm_probability: float = 0.15
+    mask_ratio: float = 0.15
     mask_value: int = -1
     max_length: Optional[int] = None
     sampling: bool = True
@@ -58,7 +59,6 @@ class AnnDataCollator:
     conditions: List[str] = None
     cls_predictions: List[str] = None
     zero_percentages: Optional[List[float]] = None
-    
 
     def __post_init__(self):
         if self.do_padding:
@@ -67,15 +67,14 @@ class AnnDataCollator:
             if self.max_length is None:
                 raise ValueError("`max_length` is required if `do_padding`.")
 
-        if isinstance(self.mlm_probability, float):
-            if self.mlm_probability <= 0 or self.mlm_probability >= 1:
-                raise ValueError("`mlm_probability` must be between 0 and 1.")
-        elif isinstance(self.mlm_probability, (list, tuple)):
-            if min(self.mlm_probability) <= 0 or max(self.mlm_probability) >= 1:
-                raise ValueError("`mlm_probability` must be between 0 and 1.")
+        if isinstance(self.mask_ratio, float):
+            if self.mask_ratio <= 0 or self.mask_ratio >= 1:
+                raise ValueError("`mask_ratio` must be between 0 and 1.")
+        elif isinstance(self.mask_ratio, (list, tuple)):
+            if min(self.mask_ratio) <= 0 or max(self.mask_ratio) >= 1:
+                raise ValueError("`mask_ratio` must be between 0 and 1.")
         else:
-            raise ValueError(
-                "`mlm_probability` must be a float or iterable of floats.")
+            raise ValueError("`mask_ratio` must be a float or iterable of floats.")
 
         if isinstance(self.reserve_keys, str):
             self.reserve_keys = [self.reserve_keys]
@@ -87,12 +86,10 @@ class AnnDataCollator:
             )
 
         if self.data_style not in ["pcpt", "gen", "both"]:
-            raise ValueError(
-                "`data_style` must be one of 'pcpt', 'gen', 'both'.")
-        
-        if self.do_binning != (self.n_bins != None):
-            raise ValueError(
-                "`do_binning` and `n_bins` have to be set in tandem.")
+            raise ValueError("`data_style` must be one of 'pcpt', 'gen', 'both'.")
+
+        if self.do_binning != (self.n_bins is not None):
+            raise ValueError("`do_binning` and `n_bins` have to be set in tandem.")
 
     def __call__(
         self, examples: List[Dict[str, torch.Tensor]]
@@ -127,11 +124,13 @@ class AnnDataCollator:
         for key in self.reserve_keys:
             data_ = [example[key] for example in examples]
             data_dict[key] = torch.stack(data_, dim=0).to(device)
-        
+
         if self.conditions:
             data_dict["conditions"] = {}
             for condition in self.conditions:
-                data_dict["conditions"][condition] = torch.LongTensor([d[condition] for d in examples]).to(device)
+                data_dict["conditions"][condition] = torch.LongTensor(
+                    [d[condition] for d in examples]
+                ).to(device)
 
         return data_dict
 
@@ -165,15 +164,18 @@ class AnnDataCollator:
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
             if self.do_binning:
-                expressions[self.keep_first_n_tokens:] = binning(
-                    row=expressions[self.keep_first_n_tokens:],
+                expressions[self.keep_first_n_tokens :] = binning(
+                    row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.n_bins,
                 )
-            
+
             zero_percentage = self._sample_zero_percentage()
 
             genes, expressions = self._sample_or_truncate_plus_pad(
-                genes, expressions, _max_length, zero_percentage=zero_percentage,
+                genes,
+                expressions,
+                _max_length,
+                zero_percentage=zero_percentage,
             )  # torch tensors of length _max_length
 
             padded_genes.append(genes)
@@ -237,9 +239,9 @@ class AnnDataCollator:
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
             if self.do_binning:
-                expressions[self.keep_first_n_tokens:] = binning(
-                    row=expressions[self.keep_first_n_tokens:],
-                    n_bins=self.n_bins, 
+                expressions[self.keep_first_n_tokens :] = binning(
+                    row=expressions[self.keep_first_n_tokens :],
+                    n_bins=self.n_bins,
                 )
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes, expressions, _max_length
@@ -248,8 +250,7 @@ class AnnDataCollator:
             padded_pcpt_expressions.append(expressions)
 
         padded_pcpt_genes = torch.stack(padded_pcpt_genes, dim=0).to(device)
-        padded_pcpt_expressions = torch.stack(
-            padded_pcpt_expressions, dim=0).to(device)
+        padded_pcpt_expressions = torch.stack(padded_pcpt_expressions, dim=0).to(device)
 
         data_dict = {
             "pcpt_gene": padded_pcpt_genes,
@@ -267,7 +268,7 @@ class AnnDataCollator:
         part. The perception part will be processed into gene ids and expr values,
         and the generation part will be processed into gene ids only.
 
-        By default, the mlm_probability will be used to select the genes assigned to
+        By default, the mask_ratio will be used to select the genes assigned to
         the generation part.
 
         Each example is like:
@@ -277,7 +278,7 @@ class AnnDataCollator:
 
         Args:
             gen_prob (float, optional): the probability of a gene being assigned to
-                the generation part. If not provided, the mlm_probability will be used.
+                the generation part. If not provided, the mask_ratio will be used.
 
         Returns:
             Dict[str, torch.Tensor]: a dict of tensors.
@@ -307,9 +308,7 @@ class AnnDataCollator:
             return self._call_gen(examples)
 
         if gen_prob is None:
-            gen_prob = self.get_mlm_probability()
-
-        device = examples[0]["genes"].device
+            gen_prob = self.get_mask_ratio()
 
         max_ori_len = max(len(example["genes"]) for example in examples)
         _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
@@ -325,13 +324,15 @@ class AnnDataCollator:
         for i in range(len(examples)):
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
-            
+
             if self.probabilistic_augmentation:
-                expressions[self.keep_first_n_tokens:] = self._probabilistic_augment(X=expressions[self.keep_first_n_tokens:])
+                expressions[self.keep_first_n_tokens :] = self._probabilistic_augment(
+                    X=expressions[self.keep_first_n_tokens :]
+                )
 
             if self.do_binning:
-                expressions[self.keep_first_n_tokens:] = binning(
-                    row=expressions[self.keep_first_n_tokens:],
+                expressions[self.keep_first_n_tokens :] = binning(
+                    row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.n_bins,
                 )
 
@@ -341,24 +342,25 @@ class AnnDataCollator:
                 pcpt_genes,
                 pcpt_expressions,
             ) = self._random_split(
-                genes[self.keep_first_n_tokens:],
-                expressions[self.keep_first_n_tokens:],
+                genes[self.keep_first_n_tokens :],
+                expressions[self.keep_first_n_tokens :],
                 ratio=gen_prob,
             )
             pcpt_genes = torch.cat(
                 (genes[: self.keep_first_n_tokens], pcpt_genes), dim=0
             )
             pcpt_expressions = torch.cat(
-                (expressions[: self.keep_first_n_tokens],
-                 pcpt_expressions), dim=0
+                (expressions[: self.keep_first_n_tokens], pcpt_expressions), dim=0
             )
 
             zero_percentage = self._sample_zero_percentage()
 
             pcpt_genes, pcpt_expressions = self._sample_or_truncate_plus_pad(
-                pcpt_genes, pcpt_expressions, pcpt_length, zero_percentage=zero_percentage
+                pcpt_genes,
+                pcpt_expressions,
+                pcpt_length,
+                zero_percentage=zero_percentage,
             )  # torch tensors of length pcpt_length
-
 
             padded_pcpt_genes.append(pcpt_genes)
             padded_pcpt_expressions.append(pcpt_expressions)
@@ -385,11 +387,11 @@ class AnnDataCollator:
         return data_dict
 
     def _probabilistic_augment(
-            self,
-            X: torch.Tensor,
-            add_noise:bool = False,
-            noise_std:int = 0.01,
-            ) -> torch.Tensor:
+        self,
+        X: torch.Tensor,
+        add_noise: bool = False,
+        noise_std: int = 0.01,
+    ) -> torch.Tensor:
         """
         Augments data using a sampling-based approach with PyTorch.
 
@@ -425,22 +427,31 @@ class AnnDataCollator:
         sampled_indices = torch.multinomial(prob_dist, n_samples, replacement=True)
 
         # Aggregate sampled indices into a new count vector
-        sampled_counts = torch.bincount(sampled_indices, minlength=cell_counts.numel()).float()
+        sampled_counts = torch.bincount(
+            sampled_indices, minlength=cell_counts.numel()
+        ).float()
 
         # Reapply log1p transformation to the sampled data
         augmented_data = torch.log1p(sampled_counts).view_as(X)
 
         # Optionally add noise
         if add_noise:
-            noise = torch.normal(mean=0.0, std=noise_std, size=augmented_data.shape, device=augmented_data.device)
+            noise = torch.normal(
+                mean=0.0,
+                std=noise_std,
+                size=augmented_data.shape,
+                device=augmented_data.device,
+            )
             augmented_data += noise
 
         return augmented_data
-    
-    def _sample_zero_percentage(
-            self
-    ) -> Optional[float]:
-        return self.zero_percentages[torch.randperm(len(self.zero_percentages))[0]] if self.zero_percentages != None else None
+
+    def _sample_zero_percentage(self) -> Optional[float]:
+        return (
+            self.zero_percentages[torch.randperm(len(self.zero_percentages))[0]]
+            if self.zero_percentages is not None
+            else None
+        )
 
     def _random_split(
         self,
@@ -481,19 +492,19 @@ class AnnDataCollator:
 
         return first_parts + second_parts
 
-    def get_mlm_probability(self) -> float:
+    def get_mask_ratio(self) -> float:
         """
         Get the mlm probability for the current step.
         """
-        if isinstance(self.mlm_probability, float):
-            return self.mlm_probability
-        elif isinstance(self.mlm_probability, list):
+        if isinstance(self.mask_ratio, float):
+            return self.mask_ratio
+        elif isinstance(self.mask_ratio, list):
             # random choose a probability
-            return np.random.choice(self.mlm_probability)
+            return np.random.choice(self.mask_ratio)
         else:
             raise ValueError(
-                "mlm_probability must be a float or a list of floats, "
-                f"but got {self.mlm_probability}."
+                "mask_ratio must be a float or a list of floats, "
+                f"but got {self.mask_ratio}."
             )
 
     def _mask(
@@ -512,7 +523,7 @@ class AnnDataCollator:
         device = expressions.device
         shape = expressions.shape
 
-        probability_matrix = torch.full(shape, self.get_mlm_probability())
+        probability_matrix = torch.full(shape, self.get_mask_ratio())
         # set padded postion probability to 0
         probability_matrix[expressions.eq(self.pad_value)] = 0
         if self.keep_first_n_tokens > 0:
@@ -534,15 +545,19 @@ class AnnDataCollator:
         assert len(genes) == len(expressions)
         if len(genes) == max_length:
             return genes, expressions
-        
+
         if len(genes) > max_length:  # sample or truncate
             if self.sampling:
-                genes, expressions = self._sample(genes, expressions, max_length, zero_percentage)
-                if genes.shape[0] == max_length: # If the sequence is not long enough, we have to pad
+                genes, expressions = self._sample(
+                    genes, expressions, max_length, zero_percentage
+                )
+                if (
+                    genes.shape[0] == max_length
+                ):  # If the sequence is not long enough, we have to pad
                     return genes, expressions
             else:
                 return genes[:max_length], expressions[:max_length]
-        return self._pad(genes, expressions, max_length) # PAD
+        return self._pad(genes, expressions, max_length)  # PAD
 
     def _sample(
         self,
@@ -557,27 +572,33 @@ class AnnDataCollator:
         # NOTE: also, the current implementation permute the orders of the genes
         # and expressions, although it is probably a nice argmentation.
         device = genes.device
-        if zero_percentage != None:
+        if zero_percentage is not None:
             zero = torch.nonzero(expressions == 0).flatten()
             non_zero = torch.nonzero(expressions).flatten()
             max_length_ = max_length
             if self.keep_first_n_tokens > 0:
-                non_zero = non_zero[self.keep_first_n_tokens:]
+                non_zero = non_zero[self.keep_first_n_tokens :]
                 max_length_ = max_length - self.keep_first_n_tokens
 
             if zero.shape[0] > 0:
-                percentage_zero_relative = (zero_percentage*max_length_)/zero.shape[0]
+                percentage_zero_relative = (zero_percentage * max_length_) / zero.shape[
+                    0
+                ]
                 mask = torch.rand(zero.size()) <= percentage_zero_relative
                 zero_sel_indices = zero[mask]
             else:
                 zero_sel_indices = zero
-            non_zero_max_length = min(non_zero.shape[0], max_length_-zero_sel_indices.shape[0])
-            non_zero_sel_indices = non_zero[torch.randperm(len(non_zero), device=device)[:non_zero_max_length]]
+            non_zero_max_length = min(
+                non_zero.shape[0], max_length_ - zero_sel_indices.shape[0]
+            )
+            non_zero_sel_indices = non_zero[
+                torch.randperm(len(non_zero), device=device)[:non_zero_max_length]
+            ]
 
             indices = torch.cat((zero_sel_indices, non_zero_sel_indices), dim=0)
             if self.keep_first_n_tokens > 0:
-                indices= torch.cat((torch.arange(self.keep_first_n_tokens), indices))
-            
+                indices = torch.cat((torch.arange(self.keep_first_n_tokens), indices))
+
             return genes[indices], expressions[indices]
         else:
             if self.keep_first_n_tokens == 0:
@@ -586,8 +607,7 @@ class AnnDataCollator:
 
             # keep the first n tokens unchanged
             _n = self.keep_first_n_tokens
-            indices = torch.randperm(
-                len(genes) - _n, device=device)[: max_length - _n]
+            indices = torch.randperm(len(genes) - _n, device=device)[: max_length - _n]
             indices = torch.cat([torch.arange(_n), indices + _n], dim=0)
             return genes[indices], expressions[indices]
 

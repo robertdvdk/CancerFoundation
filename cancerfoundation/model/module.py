@@ -550,6 +550,10 @@ class TransformerModule(nn.Module):
             loss = loss_expr = self.criterion(
                 gen_expr_preds, gen_expr_target, positions_to_match
             )
+            print("LOSS", loss)
+            print(gen_expr_preds.shape, gen_expr_target.shape, positions_to_match.shape)
+            print("PREDS", gen_expr_preds)
+            print("TARGET", gen_expr_target)
             loss_dict["loss_expr"] = loss_expr
 
             if self.MVC:
@@ -576,6 +580,22 @@ class TransformerModule(nn.Module):
                     loss = loss + loss_gepc_zero_log_prob
                     loss_dict["loss_gepc_zero_log_prob"] = loss_gepc_zero_log_prob
 
+            previous_cell_embs = output_dict["cell_emb"].detach()
+            preds = self.generative_forward(
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_key_padding_mask,
+                MVC=False,
+                input_cell_emb=previous_cell_embs,
+                conditions=conditions_batch,
+            )["gen_preds"]
+
+            loss_gen = self.criterion(preds, gen_expr_target, positions_to_match)
+            loss = loss + use_cell_embedding * loss_gen
+            loss_dict["loss_gen"] = loss_gen
+
         else:
             input_gene_ids, input_values, src_key_padding_mask, target_values = (
                 self._prepare_perceptual_input(tensors)
@@ -589,13 +609,22 @@ class TransformerModule(nn.Module):
             )
 
             output_values = output_dict["mlm_output"]
+            # print(output_values.shape)
+            # print(target_values.shape)
+            # print(src_key_padding_mask.shape)
+            # print(output_values)
+            # print(target_values)
+            # print(src_key_padding_mask)
 
-            positions_to_match = input_values.eq(
-                self.mask_value
-            )  # the postions to predict
+            positions_to_match = ~src_key_padding_mask
+            # positions_to_match = input_values.eq(
+            #     self.mask_value
+            # )  # the postions to predict
             loss = loss_expr = self.criterion(
                 output_values, target_values, positions_to_match
             )
+
+            # print(loss)
 
             if self.MVC:
                 loss_mvc = self.criterion(
@@ -628,22 +657,6 @@ class TransformerModule(nn.Module):
                     loss_dict["condition_" + condition] = condition_loss.detach() / len(
                         self.conditions
                     )
-
-        previous_cell_embs = output_dict["cell_emb"].detach()
-        preds = self.generative_forward(
-            pcpt_gene,
-            pcpt_expr,
-            pcpt_key_padding_mask,
-            gen_gene,
-            gen_key_padding_mask,
-            MVC=False,
-            input_cell_emb=previous_cell_embs,
-            conditions=conditions_batch,
-        )["gen_preds"]
-
-        loss_gen = self.criterion(preds, gen_expr_target, positions_to_match)
-        loss = loss + use_cell_embedding * loss_gen
-        loss_dict["loss_gen"] = loss_gen
 
         loss_dict["total_loss"] = loss
         return loss_dict
