@@ -109,7 +109,7 @@ class TransformerModule(nn.Module):
 
         self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
 
-        self.flag_encoder = nn.Embedding(2, d_model)
+        # self.flag_encoder = nn.Embedding(2, d_model)
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if input_emb_style == "continuous":
@@ -550,10 +550,6 @@ class TransformerModule(nn.Module):
             loss = loss_expr = self.criterion(
                 gen_expr_preds, gen_expr_target, positions_to_match
             )
-            print("LOSS", loss)
-            print(gen_expr_preds.shape, gen_expr_target.shape, positions_to_match.shape)
-            print("PREDS", gen_expr_preds)
-            print("TARGET", gen_expr_target)
             loss_dict["loss_expr"] = loss_expr
 
             if self.MVC:
