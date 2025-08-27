@@ -109,8 +109,6 @@ class TransformerModule(nn.Module):
 
         self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
 
-        # self.flag_encoder = nn.Embedding(2, d_model)
-
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if input_emb_style == "continuous":
             self.value_encoder = ContinuousValueEncoder(d_model, dropout)
@@ -157,6 +155,7 @@ class TransformerModule(nn.Module):
                 norm_scheme=self.norm_scheme,
             )
             self.transformer_encoder = CFGenerator(encoder_layers, nlayers)
+            self.flag_encoder = nn.Embedding(2, d_model)
         else:
             encoder_layers = TransformerEncoderLayer(
                 d_model, nhead, d_hid, dropout, batch_first=True
