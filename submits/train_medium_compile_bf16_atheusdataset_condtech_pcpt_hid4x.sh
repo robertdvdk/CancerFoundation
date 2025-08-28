@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_medium_compile_bf16_atheusdataset_condtech_pcpt_gelu_prenorm
+#SBATCH --job-name=train_medium_compile_bf16_atheusdataset_condtech_pcpt_hid4x
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=08:00:00
 #SBATCH --partition=gpu
@@ -27,7 +27,7 @@ srun singularity run \
     --nlayers 6 \
     --nheads 8 \
     --embsize 256 \
-    --d-hi 512 \
+    --d-hi 1024 \
     --epochs 15 \
     --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
@@ -45,9 +45,7 @@ srun singularity run \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
     --compile \
     --precision "bf16-mixed" \
-    --training-tasks "pcpt" \
-    --activation "gelu" \
-    --norm-first
+    --training-tasks "pcpt"
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"

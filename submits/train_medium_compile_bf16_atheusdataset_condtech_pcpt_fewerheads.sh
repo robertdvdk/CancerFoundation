@@ -1,12 +1,11 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_medium_compile_bf16_atheusdataset_condtech_pcpt_gelu_prenorm_hilr
+#SBATCH --job-name=train_medium_compile_bf16_atheusdataset_condtech_pcpt_fewerheads
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=06:00:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
-#SBATCH --exclude=gpu-biomed-25
 
 set -e
 
@@ -26,11 +25,11 @@ srun singularity run \
     --max-seq-len 1200 \
     --batch-size 256 \
     --nlayers 6 \
-    --nheads 8 \
+    --nheads 4 \
     --embsize 256 \
     --d-hi 512 \
     --epochs 15 \
-    --lr 0.0005 \
+    --lr 0.0001 \
     --warmup-ratio-or-step 10000 \
     --val-check-interval 0.5 \
     --trunc-by-sample \
