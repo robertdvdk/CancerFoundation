@@ -158,7 +158,13 @@ class TransformerModule(nn.Module):
             self.flag_encoder = nn.Embedding(2, d_model)
         else:
             encoder_layers = TransformerEncoderLayer(
-                d_model, nhead, d_hid, dropout, batch_first=True
+                d_model,
+                nhead,
+                d_hid,
+                dropout,
+                batch_first=True,
+                norm_first=True,
+                activation=F.gelu,
             )
             self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
@@ -206,7 +212,18 @@ class TransformerModule(nn.Module):
         Returns:
             Tensor: The output of the Transformer encoder, of shape (batch, seq_len, embsize).
         """
-        if not self.use_generative_training:
+        if self.use_generative_training:
+            output_pcpt, _ = self.transformer_generate(
+                pcpt_genes=src,
+                pcpt_values=values,
+                pcpt_key_padding_mask=src_key_padding_mask,
+                gen_genes=None,
+                gen_key_padding_mask=None,
+                conditions=conditions,
+            )
+            output = output_pcpt
+
+        else:
             self._check_condition_labels(conditions)
 
             src = self.encoder(src)  # (batch, seq_len, embsize)
@@ -233,16 +250,6 @@ class TransformerModule(nn.Module):
                 total_embs, src_key_padding_mask=src_key_padding_mask
             )
 
-        else:
-            output_pcpt, _ = self.transformer_generate(
-                pcpt_genes=src,
-                pcpt_values=values,
-                pcpt_key_padding_mask=src_key_padding_mask,
-                gen_genes=None,
-                gen_key_padding_mask=None,
-                conditions=conditions,
-            )
-            output = output_pcpt
         return output  # (batch, seq_len, embsize)
 
     def transformer_generate(
@@ -667,7 +674,7 @@ class TransformerModule(nn.Module):
         Returns:
             The total loss for the batch.
         """
-        loss_dict = self.model(batch, use_cell_embedding=False)
+        loss_dict = self(batch, use_cell_embedding=False)
         return loss_dict["total_loss"]
 
     def generative_forward(
@@ -1052,18 +1059,18 @@ class ExprDecoder(nn.Module):
         d_in = d_model * (len(conditions) + 1) if conditions else d_model
         self.fc = nn.Sequential(
             nn.Linear(d_in, d_model),
-            nn.LeakyReLU(),
+            nn.GELU(),
             nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
+            nn.GELU(),
             nn.Linear(d_model, out_dim),
         )
         self.explicit_zero_prob = explicit_zero_prob
         if explicit_zero_prob:
             self.zero_logit = nn.Sequential(
                 nn.Linear(d_in, d_model),
-                nn.LeakyReLU(),
+                nn.GELU(),
                 nn.Linear(d_model, d_model),
-                nn.LeakyReLU(),
+                nn.GELU(),
                 nn.Linear(d_model, out_dim),
             )
 
@@ -1207,7 +1214,7 @@ class AdversarialDiscriminator(nn.Module):
         d_model: int,
         n_cls: int,
         nlayers: int = 3,
-        activation: Type[nn.Module] = nn.LeakyReLU,
+        activation: Type[nn.Module] = nn.GELU,
     ):
         """Initializes the AdversarialDiscriminator.
 
@@ -1215,7 +1222,7 @@ class AdversarialDiscriminator(nn.Module):
             d_model (int): Dimension of the input embeddings (cell embeddings).
             n_cls (int): Number of domain classes to predict.
             nlayers (int, optional): Number of layers in the discriminator network. Defaults to 3.
-            activation (Type[nn.Module], optional): Activation function for hidden layers. Defaults to nn.LeakyReLU.
+            activation (Type[nn.Module], optional): Activation function for hidden layers. Defaults to nn.GELU.
         """
         super().__init__()
         self._decoder = nn.ModuleList()
