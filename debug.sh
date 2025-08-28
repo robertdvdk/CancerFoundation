@@ -12,12 +12,13 @@ python pretrain.py \
     --warmup-ratio-or-step 10000 \
     --trunc-by-sample \
     --loss "mse" \
-    --train-path "./DATA/test/processed_data/train" \
+    --train-path "./DATA/brain/processed_data/train" \
     --zero-percentages 0.2 0.4 0.6 \
     --conditions "technology" \
     --balance-primary "tissue" \
     --balance-secondary "technology" \
-    --wandb "cells" \
-    --strategy='ddp_find_unused_parameters_true' \
-    --grad-accu-steps 16 \
-    --seed 0
+    --strategy='auto' \
+    --grad-accu-steps 1 \
+    --seed 0 \
+    --training-tasks "both" \
+    --resume-from-checkpoint "./save/condtech/epoch_epoch=04.ckpt"
