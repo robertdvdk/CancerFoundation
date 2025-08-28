@@ -14,6 +14,10 @@ from .grad_reverse import grad_reverse
 from .layers import CFLayer, CFGenerator
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
+torch.backends.cuda.enable_flash_sdp(True)
+torch.backends.cuda.enable_mem_efficient_sdp(True)
+torch.backends.cuda.enable_math_sdp(False)  # forbid the big MATH fallback
+
 
 def with_sdp_kernel(func):
     """Decorator to run a function within the Scaled Dot-Product Attention kernel context."""
@@ -663,7 +667,6 @@ class TransformerModule(nn.Module):
         loss_dict["total_loss"] = loss
         return loss_dict
 
-    @with_sdp_kernel
     def training_step(self, batch, batch_idx):
         """Performs a single training step (for PyTorch Lightning).
 
