@@ -117,6 +117,7 @@ def main():
         n_bins=args.n_bins,
     )
     datamodule.setup(stage="fit")
+
     if args.resume_from_checkpoint:
         model = CancerFoundation.load_from_checkpoint(
             args.resume_from_checkpoint, vocab=datamodule.vocab
@@ -152,6 +153,8 @@ def main():
             balance_primary=args.balance_primary,
             balance_secondary=args.balance_secondary,
             compile_model=args.compile,
+            activation=args.activation,
+            norm_first=args.norm_first,
         )
 
     if args.pretrained:

@@ -299,6 +299,20 @@ def get_args():
         default=None,
         help="Run name to use for Weights and Biases",
     )
+
+    parser.add_argument(
+        "--norm-first",
+        action="store_true",
+        help="If set, use Pre-LayerNorm transformer architecture. Default is Post-LayerNorm.",
+    )
+
+    parser.add_argument(
+        "--activation",
+        type=str,
+        choices=["relu", "gelu"],
+        default="gelu",
+        help="The activation function to use in the transformer model. Default is gelu.",
+    )
     return parser.parse_args()
 
 

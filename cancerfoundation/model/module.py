@@ -1,4 +1,4 @@
-from typing import Dict, Mapping, Optional, Tuple, Union, Type
+from typing import Dict, Mapping, Optional, Tuple, Union, Type, Callable
 import warnings
 
 import torch
@@ -54,6 +54,7 @@ class TransformerModule(nn.Module):
         pad_value: int,
         pad_token_id: int,
         criterion,
+        activation: Callable[[Tensor], Tensor],
         dropout: float = 0.0,
         do_mvc: bool = False,
         conditions: Dict = None,
@@ -63,7 +64,7 @@ class TransformerModule(nn.Module):
         mvc_decoder_style: str = "inner product",
         explicit_zero_prob: bool = False,
         use_generative_training=False,
-        pre_norm: bool = False,
+        norm_first: bool = False,
         do_dat: bool = False,
         batchnorm: bool = False,
     ):
@@ -100,7 +101,7 @@ class TransformerModule(nn.Module):
         self.cell_emb_style = cell_emb_style
         self.explicit_zero_prob = explicit_zero_prob
         self.pad_token_id = pad_token_id
-        self.norm_scheme = "pre" if pre_norm else "post"
+        self.norm_scheme = "pre" if norm_first else "post"
 
         self.n_input_bins = n_input_bins
         if self.input_emb_style not in ["category", "continuous", "scaling"]:
@@ -167,8 +168,8 @@ class TransformerModule(nn.Module):
                 d_hid,
                 dropout,
                 batch_first=True,
-                norm_first=True,
-                activation=F.gelu,
+                norm_first=norm_first,
+                activation=activation,
             )
             self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 

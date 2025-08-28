@@ -10,6 +10,7 @@ from cancerfoundation.loss import get_loss
 from safetensors import safe_open
 from cancerfoundation.loss import LossType
 from pytorch_lightning.utilities.types import OptimizerLRSchedulerConfig
+import torch.nn.functional as F
 
 
 class CancerFoundation(pl.LightningModule):
@@ -41,6 +42,8 @@ class CancerFoundation(pl.LightningModule):
         scheduler_interval: int,
         scheduler_factor: float,
         compile_model: bool,
+        activation: str,
+        norm_first: bool,
         data_path: Union[str, os.PathLike],
         loss_type: LossType = LossType.MSE,
         conditions: Optional[List[str]] = None,
@@ -113,6 +116,8 @@ class CancerFoundation(pl.LightningModule):
         self.data_path = data_path
         self.epochs = epochs
         self.compile_model = compile_model
+        self.activation = F.relu if activation == "relu" else F.gelu
+        self.norm_first = norm_first
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -181,6 +186,8 @@ class CancerFoundation(pl.LightningModule):
             use_generative_training=self.USE_GENERATIVE_TRAINING,
             do_dat=self.do_dat,
             explicit_zero_prob=self.explicit_zero_prob,
+            activation=self.activation,
+            norm_first=self.norm_first,
         )
         if self.compile_model:
             self.model = torch.compile(self.model)
