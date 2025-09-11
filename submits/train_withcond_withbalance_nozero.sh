@@ -1,12 +1,11 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_nocond_withbalance
+#SBATCH --job-name=train_withcond_withbalance_nozero
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=13:00:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
-#SBATCH --exclude=gpu-biomed-05,gpu-biomed-17,gpu-biomed-25,gpu-biomed-27
 
 set -e
 
