@@ -6,6 +6,7 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
+#SBATCH --exclude=gpu-biomed-17,gpu-biomed-20,gpu-biomed-21,gpu-biomed-26
 
 set -e
 
@@ -34,10 +35,10 @@ srun singularity run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
+    --conditions technology \
     --balance-primary tissue \
     --balance-secondary technology \
     --train-path "$TRAIN_DIR" \
-    --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
     --seed 0 \
     --wandb "brain" \
