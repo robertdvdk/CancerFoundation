@@ -313,6 +313,12 @@ def get_args():
         default="gelu",
         help="The activation function to use in the transformer model. Default is gelu.",
     )
+
+    parser.add_argument(
+        "--do-mvc",
+        action="store_true",
+        help="Whether to predict all gene expression levels from just the class embedding during pre-training.",
+    )
     return parser.parse_args()
 
 

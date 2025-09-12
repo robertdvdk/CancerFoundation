@@ -45,6 +45,7 @@ class CancerFoundation(pl.LightningModule):
         activation: str,
         norm_first: bool,
         data_path: Union[str, os.PathLike],
+        do_mvc: bool,
         loss_type: LossType = LossType.MSE,
         conditions: Optional[List[str]] = None,
         conditions_nums: Optional[Any] = None,
@@ -122,7 +123,7 @@ class CancerFoundation(pl.LightningModule):
         # Training configuration
         self.pad_token = "<pad>"
         self.cls_token = "<cls>"
-        self.MVC = True
+        self.do_mvc = do_mvc
         self.USE_GENERATIVE_TRAINING = (
             True if self.training_tasks in ["gen", "both"] else False
         )
@@ -179,7 +180,7 @@ class CancerFoundation(pl.LightningModule):
             pad_token_id=self.pad_token_id,
             criterion=self.criterion,
             pad_value=self.pad_value,
-            do_mvc=self.MVC,
+            do_mvc=self.do_mvc,
             conditions=self.conditions_nums,
             input_emb_style=self.input_emb_style,
             n_input_bins=self.n_input_bins,

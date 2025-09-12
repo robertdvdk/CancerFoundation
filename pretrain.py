@@ -149,6 +149,7 @@ def main():
             mvc_decoder_style=args.mvc_decoder_style,
             scale_zero_expression=args.scale_zero_expression,
             data_path=args.train_path,
+            do_mvc=args.do_mvc,
             zero_percentages=args.zero_percentages,
             balance_primary=args.balance_primary,
             balance_secondary=args.balance_secondary,
