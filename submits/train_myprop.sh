@@ -10,12 +10,12 @@
 set -e
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/medium/processed_data_default/train"
+TRAIN_DIR="/cluster/work/boeva/atheus/CancerFoundation/pretraining_data/cancer_gpt"
 mkdir -p "$SAVE_DIR"
 
 srun singularity run \
-    --pwd /cluster/work/boeva/rvander/CancerFoundation \
-    --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
+    --pwd /cluster/work/boeva/rvander/my_prop/CancerFoundation \
+    --bind /cluster/work/boeva/rvander/my_prop/CancerFoundation:/cluster/work/boeva/rvander/my_prop/CancerFoundation \
     --bind /cluster/dataset/boeva/rvander/DATA:/cluster/dataset/boeva/rvander/DATA \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
