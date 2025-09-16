@@ -46,16 +46,18 @@ class CancerFoundation(pl.LightningModule):
         norm_first: bool,
         data_path: Union[str, os.PathLike],
         do_mvc: bool,
-        loss_type: LossType = LossType.MSE,
-        conditions: Optional[List[str]] = None,
-        conditions_nums: Optional[Any] = None,
-        mvc_decoder_style: str = "inner product",
-        scale_zero_expression: Optional[float] = None,
-        do_dat: bool = False,
-        explicit_zero_prob: Optional[bool] = False,
-        balance_primary: Optional[str] = None,
-        balance_secondary: Optional[str] = None,
-        zero_percentages: Optional[List[float]] = None,
+        loss_type: LossType,
+        conditions: Optional[List[str]],
+        conditions_nums: Optional[Any],
+        mvc_decoder_style: str,
+        scale_zero_expression: Optional[float],
+        do_dat: bool,
+        explicit_zero_prob: Optional[bool],
+        balance_primary: Optional[str],
+        balance_secondary: Optional[str],
+        zero_percentages: Optional[List[float]],
+        cell_emb_style: str,
+        batchnorm: bool,
     ):
         """Initializes the CancerFoundation LightningModule.
 
@@ -119,6 +121,8 @@ class CancerFoundation(pl.LightningModule):
         self.compile_model = compile_model
         self.activation = F.relu if activation == "relu" else F.gelu
         self.norm_first = norm_first
+        self.batchnorm = batchnorm
+        self.cell_emb_style = cell_emb_style
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -189,6 +193,8 @@ class CancerFoundation(pl.LightningModule):
             explicit_zero_prob=self.explicit_zero_prob,
             activation=self.activation,
             norm_first=self.norm_first,
+            batchnorm=self.batchnorm,
+            cell_emb_style=self.cell_emb_style,
         )
         if self.compile_model:
             self.model = torch.compile(self.model)
@@ -246,7 +252,6 @@ class CancerFoundation(pl.LightningModule):
             print(
                 f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders)} batches"
             )
-
         loss_dict = self.forward(batch, use_cell_embedding=True)
 
         # Log validation metrics

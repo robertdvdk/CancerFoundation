@@ -2,14 +2,14 @@ python pretrain.py \
     --gpus 1 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 4 \
+    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
-    --embsize 256 \
-    --d-hid 512 \
+    --embsize 128 \
+    --d-hid 256 \
     --epochs 15 \
     --lr 0.0001 \
-    --warmup-ratio-or-step 10000 \
+    --warmup-ratio-or-step 1 \
     --trunc-by-sample \
     --loss "mse" \
     --train-path "./DATA/brain/processed_data/train" \
@@ -20,5 +20,6 @@ python pretrain.py \
     --strategy='auto' \
     --grad-accu-steps 1 \
     --seed 0 \
-    --training-tasks "both" \
-    --resume-from-checkpoint "./save/condtech/epoch_epoch=04.ckpt"
+    --training-tasks "pcpt" \
+    --do-dat \
+    --do-mvc

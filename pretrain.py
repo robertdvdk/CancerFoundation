@@ -18,17 +18,16 @@ def train_model(
     max_epochs: int,
     save_dir: str,
     precision: str,
-    num_nodes: int = 1,
-    gpus: int = 4,
-    wandb_project: Optional[str] = None,
-    wandb_entity: Optional[str] = None,
-    wandb_name: Optional[str] = None,
-    resume_from_checkpoint: Optional[str] = None,
-    strategy: str = "auto",
-    gradient_clip_val: float = 1.0,
-    accumulate_grad_batches: int = 1,
-    check_val_every_n_epoch: int = 1,
-    val_check_interval: float = 1.0,
+    num_nodes: int,
+    gpus: int,
+    wandb_project: Optional[str],
+    wandb_entity: Optional[str],
+    wandb_name: Optional[str],
+    resume_from_checkpoint: Optional[str],
+    strategy: str,
+    gradient_clip_val: float,
+    accumulate_grad_batches: int,
+    val_check_interval: float,
 ):
     """
     Train the model using PyTorch Lightning Trainer
@@ -45,7 +44,7 @@ def train_model(
         precision: Precision ('16-mixed', '32', 'bf16-mixed')
         accumulate_grad_batches: Number of batches to accumulate gradients
         gradient_clip_val: Gradient clipping value
-        check_val_every_n_epoch: Validation frequency
+        val_check_interval: Validation frequency
         pretrained_model_path: Path to pretrained model weights
     """
 
@@ -156,6 +155,9 @@ def main():
             compile_model=args.compile,
             activation=args.activation,
             norm_first=args.norm_first,
+            cell_emb_style=args.cell_emb_style,
+            batchnorm=args.batchnorm,
+            explicit_zero_prob=args.explicit_zero_prob,
         )
 
     if args.pretrained:
@@ -184,6 +186,7 @@ def main():
         accumulate_grad_batches=args.grad_accu_steps,
         strategy=args.strategy,
         precision=args.precision,
+        gradient_clip_val=args.gradient_clip_val,
     )
 
 

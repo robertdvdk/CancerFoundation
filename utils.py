@@ -319,6 +319,32 @@ def get_args():
         action="store_true",
         help="Whether to predict all gene expression levels from just the class embedding during pre-training.",
     )
+
+    parser.add_argument(
+        "--gradient-clip-val",
+        type=float,
+        default=1.0,
+        help="The value at which gradients will be clipped. Default is 1.0.",
+    )
+
+    parser.add_argument(
+        "--cell-emb-style",
+        type=str,
+        default="cls",
+        help="The style of the cell embedding. Default is 'cls'.",
+    )
+
+    parser.add_argument(
+        "--batchnorm",
+        action="store_true",
+        help="Whether to use batch normalization on the input embeddings. Default is False.",
+    )
+
+    parser.add_argument(
+        "--explicit-zero-prob",
+        action="store_true",
+        help="Whether to explicitly model the probability of a gene being zero-inflated. Default is False.",
+    )
     return parser.parse_args()
 
 
