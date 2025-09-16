@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from typing import Optional
 
@@ -63,7 +64,8 @@ def train_model(
 
     # Setup logger
     logger = None
-    if wandb_project:
+    global_rank = int(os.environ.get("GLOBAL_RANK", "0"))
+    if wandb_project and global_rank == 0:
         logger = WandbLogger(
             entity=wandb_entity,
             project=wandb_project,
