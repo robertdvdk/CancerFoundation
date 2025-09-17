@@ -345,6 +345,10 @@ def get_args():
         action="store_true",
         help="Whether to explicitly model the probability of a gene being zero-inflated. Default is False.",
     )
+
+    parser.add_argument(
+        "--log-interval", type=int, default=5, help="Log every n steps."
+    )
     return parser.parse_args()
 
 

@@ -5,8 +5,8 @@ python pretrain.py \
     --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
-    --embsize 128 \
-    --d-hid 256 \
+    --embsize 256 \
+    --d-hid 512 \
     --epochs 15 \
     --lr 0.0001 \
     --warmup-ratio-or-step 1 \
