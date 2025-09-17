@@ -54,7 +54,7 @@ def train_model(
     callbacks.append(MyProgressBar(refresh_rate=5))
     # Model checkpointing
     checkpoint_callback = ModelCheckpoint(
-        dirpath=save_dir, filename="epoch_{epoch:02d}", every_n_epochs=1
+        dirpath=save_dir, filename="epoch_{epoch:02d}", every_n_epochs=1, save_top_k=-1
     )
     callbacks.append(checkpoint_callback)
 
