@@ -422,6 +422,8 @@ class TransformerModule(nn.Module):
             )
             src = self.encoder(src)
             src = torch.cat([condition_emb, src], dim=1)
+        print(src.shape)
+        print(values.shape)
         transformer_output = self.encode(src, values, src_key_padding_mask, conditions)
         output = {}
         mlm_output = self.decoder(transformer_output)
