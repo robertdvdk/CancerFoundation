@@ -58,6 +58,7 @@ class CancerFoundation(pl.LightningModule):
         zero_percentages: Optional[List[float]],
         cell_emb_style: str,
         batchnorm: bool,
+        weight_conditionloss: float,
     ):
         """Initializes the CancerFoundation LightningModule.
 
@@ -123,6 +124,7 @@ class CancerFoundation(pl.LightningModule):
         self.norm_first = norm_first
         self.batchnorm = batchnorm
         self.cell_emb_style = cell_emb_style
+        self.weight_conditionloss = weight_conditionloss
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -195,6 +197,7 @@ class CancerFoundation(pl.LightningModule):
             norm_first=self.norm_first,
             batchnorm=self.batchnorm,
             cell_emb_style=self.cell_emb_style,
+            weight_conditionloss=self.weight_conditionloss,
         )
         if self.compile_model:
             self.model = torch.compile(self.model)

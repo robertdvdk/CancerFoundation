@@ -161,6 +161,7 @@ def main():
             cell_emb_style=args.cell_emb_style,
             batchnorm=args.batchnorm,
             explicit_zero_prob=args.explicit_zero_prob,
+            weight_conditionloss=args.weight_conditionloss,
         )
 
     if args.pretrained:

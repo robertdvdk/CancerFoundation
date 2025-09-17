@@ -61,6 +61,7 @@ class TransformerModule(nn.Module):
         norm_first: bool,
         do_dat: bool,
         batchnorm: bool,
+        weight_conditionloss: float,
     ):
         """Initializes the TransformerModule.
 
@@ -96,6 +97,7 @@ class TransformerModule(nn.Module):
         self.explicit_zero_prob = explicit_zero_prob
         self.pad_token_id = pad_token_id
         self.norm_scheme = "pre" if norm_first else "post"
+        self.weight_conditionloss = weight_conditionloss
 
         self.n_input_bins = n_input_bins
         if self.input_emb_style not in ["category", "continuous", "scaling"]:
@@ -353,9 +355,12 @@ class TransformerModule(nn.Module):
         if self.do_dat:
             if self.conditions:
                 for condition in self.conditions:
-                    condition_loss = self.criterion_conditions(
-                        output_dict["condition_output"][condition],
-                        conditions_batch[condition].squeeze(),
+                    condition_loss = (
+                        self.criterion_conditions(
+                            output_dict["condition_output"][condition],
+                            conditions_batch[condition].squeeze(),
+                        )
+                        * self.weight_conditionloss
                     )
                     loss_dict["condition_acc_" + condition] = (
                         (

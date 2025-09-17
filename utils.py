@@ -349,6 +349,13 @@ def get_args():
     parser.add_argument(
         "--log-interval", type=int, default=5, help="Log every n steps."
     )
+
+    parser.add_argument(
+        "--weight-conditionloss",
+        type=float,
+        default=1.0,
+        help="Weight for the DAT condition loss",
+    )
     return parser.parse_args()
 
 
