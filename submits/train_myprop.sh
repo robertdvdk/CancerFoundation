@@ -33,6 +33,7 @@ srun singularity run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
+    --conditions "technology" \
     --balance-primary tissue \
     --balance-secondary technology \
     --train-path "$TRAIN_DIR" \
@@ -44,7 +45,8 @@ srun singularity run \
     --precision "bf16-mixed" \
     --training-tasks "pcpt" \
     --do-mvc \
-    --do-dat
+    --do-dat \
+    --compile
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
