@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_myprop
+#SBATCH --job-name=train_myprop_weight50
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=07:00:00
 #SBATCH --partition=gpu
