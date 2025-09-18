@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_myprop
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=07:00:00
+#SBATCH --time=03:00:00
 #SBATCH --partition=gpu
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:rtx4090:1
@@ -16,7 +16,7 @@ mkdir -p "$SAVE_DIR"
 srun singularity run \
     --pwd /cluster/work/boeva/rvander/my_prop/CancerFoundation \
     --bind /cluster/work/boeva/rvander/my_prop/CancerFoundation:/cluster/work/boeva/rvander/my_prop/CancerFoundation \
-    --bind /cluster/work/boeva/atheus/CancerFoundation/pretraining_data:/cluster/work/boeva/atheus/CancerFoundation/pretraining_data \
+    --bind /cluster/dataset/boeva/rvander/DATA/brain/processed_data/train:/cluster/dataset/boeva/rvander/DATA/brain/processed_data/train \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
     --gpus 1 \
