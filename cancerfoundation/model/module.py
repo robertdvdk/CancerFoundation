@@ -62,6 +62,8 @@ class TransformerModule(nn.Module):
         do_dat: bool,
         batchnorm: bool,
         weight_conditionloss: float,
+        dat_scale: float,
+        normalise_bins: bool,
     ):
         """Initializes the TransformerModule.
 
@@ -137,8 +139,7 @@ class TransformerModule(nn.Module):
                 for cond_name, cond_num in self.conditions.items():
                     self.grad_reverse_discriminators[cond_name] = (
                         AdversarialDiscriminator(
-                            d_model,
-                            n_cls=cond_num,
+                            d_model, n_cls=cond_num, scale=dat_scale
                         )
                     )
 
@@ -157,6 +158,7 @@ class TransformerModule(nn.Module):
             explicit_zero_prob=explicit_zero_prob,
             conditions=self.conditions,
             out_dim=out_dim,
+            normalise_bins=normalise_bins,
         )
 
         if do_mvc:
@@ -166,6 +168,7 @@ class TransformerModule(nn.Module):
                 explicit_zero_prob=explicit_zero_prob,
                 conditions=self.conditions,
                 out_dim=out_dim,
+                normalise_bins=normalise_bins,
             )
 
         self.init_weights()
@@ -362,13 +365,11 @@ class TransformerModule(nn.Module):
                         )
                         * self.weight_conditionloss
                     )
-                    loss_dict["condition_acc_" + condition] = (
-                        (
-                            conditions_batch[condition]
-                            == output_dict["condition_output"][condition]
-                            .argmax(dim=-1)
-                            .unsqueeze(1)
-                        )
+                    loss_dict[condition + "_confidence"] = (
+                        output_dict["condition_output"][condition]
+                        .softmax(dim=-1)
+                        .gather(dim=1, index=conditions_batch[condition].unsqueeze(1))
+                        .squeeze(1)
                         .float()
                         .mean()
                     )
@@ -594,6 +595,7 @@ class ExprDecoder(nn.Module):
         self,
         d_model: int,
         out_dim: int,
+        normalise_bins: bool,
         explicit_zero_prob: bool = False,
         conditions: Optional[Dict] = None,
     ):
@@ -606,6 +608,7 @@ class ExprDecoder(nn.Module):
             conditions (Optional[Dict], optional): Configuration for additional conditions, used to adjust the input dimension. Defaults to None.
         """
         super().__init__()
+        self.normalise_bins = normalise_bins
         # d_in = d_model * (len(conditions) + 1) if conditions else d_model
         d_in = d_model  # If we feed condition token to transformer, rather than at the end.
         self.fc = nn.Sequential(
@@ -637,6 +640,8 @@ class ExprDecoder(nn.Module):
         """
         pred_value = self.fc(x).squeeze(-1)  # (batch, seq_len)
         if not self.explicit_zero_prob:
+            if self.normalise_bins:
+                pred_value = torch.sigmoid(pred_value)
             return dict(pred=pred_value)
         zero_logits = self.zero_logit(x).squeeze(-1)  # (batch, seq_len)
         zero_probs = torch.sigmoid(zero_logits)
@@ -650,6 +655,7 @@ class MVCDecoder(nn.Module):
         self,
         d_model: int,
         out_dim: int,
+        normalise_bins: bool,
         arch_style: str = "inner product",
         query_activation: Type[nn.Module] = nn.Sigmoid,
         hidden_activation: Type[nn.Module] = nn.PReLU,
@@ -675,6 +681,7 @@ class MVCDecoder(nn.Module):
 
         d_in = d_model * (len(conditions) + 1) if conditions else d_model
         self.out_dim = out_dim
+        self.normalise_bins = normalise_bins
         if arch_style in ["inner product", "inner product, detach"]:
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
@@ -727,7 +734,7 @@ class MVCDecoder(nn.Module):
                 pred_value = pred_value.unsqueeze(2)
                 pred_value = self.fc1(pred_value)
             if not self.explicit_zero_prob:
-                return dict(pred=pred_value)
+                return dict(pred=F.sigmoid(pred_value))
             # zero logits need to based on the cell_emb, because of input exprs
             zero_logits = torch.bmm(self.W_zero_logit(query_vecs), cell_emb).squeeze(2)
             zero_probs = torch.sigmoid(zero_logits)
@@ -763,6 +770,7 @@ class AdversarialDiscriminator(nn.Module):
         self,
         d_model: int,
         n_cls: int,
+        scale: float,
         nlayers: int = 3,
         activation: Type[nn.Module] = nn.GELU,
     ):
@@ -781,6 +789,7 @@ class AdversarialDiscriminator(nn.Module):
             self._decoder.append(activation())
             self._decoder.append(nn.LayerNorm(d_model))
         self.out_layer = nn.Linear(d_model, n_cls)
+        self.scale = scale
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass for the discriminator.
@@ -791,7 +800,7 @@ class AdversarialDiscriminator(nn.Module):
         Returns:
             Tensor: Output logits of shape [batch_size, n_cls].
         """
-        x = grad_reverse(x, scale=1.0)
+        x = grad_reverse(x, scale=self.scale)
         for layer in self._decoder:
             x = layer(x)
         return self.out_layer(x)

@@ -41,12 +41,14 @@ class AnnDataCollator:
             Choices: "pcpt", "gen", "both". Default to "pcpt".
     """
 
+    normalise_bins: bool
     do_padding: bool = True
     gene_key: str = "var_gene_token"
     pad_token_id: Optional[int] = None
     pad_value: int = 0
     do_mlm: bool = True
     do_binning: bool = True
+
     probabilistic_augmentation: bool = False
     mask_ratio: float = 0.15
     mask_value: int = -1
@@ -164,10 +166,19 @@ class AnnDataCollator:
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
             if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
-                    row=expressions[self.keep_first_n_tokens :],
-                    n_bins=self.n_bins,
-                )
+                if self.normalise_bins:
+                    expressions[self.keep_first_n_tokens :] = (
+                        binning(
+                            row=expressions[self.keep_first_n_tokens :],
+                            n_bins=self.n_bins,
+                        )
+                        / self.n_bins
+                    )  # scale to 0-1
+                else:
+                    expressions[self.keep_first_n_tokens :] = binning(
+                        row=expressions[self.keep_first_n_tokens :],
+                        n_bins=self.n_bins,
+                    )
 
             zero_percentage = self._sample_zero_percentage()
 
@@ -197,7 +208,6 @@ class AnnDataCollator:
         else:
             masked_expressions = padded_expressions
         data_dict["masked_expr"] = masked_expressions
-
         return data_dict
 
     def _call_gen(

@@ -59,6 +59,8 @@ class CancerFoundation(pl.LightningModule):
         cell_emb_style: str,
         batchnorm: bool,
         weight_conditionloss: float,
+        dat_scale: float,
+        normalise_bins: bool,
     ):
         """Initializes the CancerFoundation LightningModule.
 
@@ -140,6 +142,9 @@ class CancerFoundation(pl.LightningModule):
         self.conditions = conditions
         self.conditions_nums = conditions_nums
 
+        self.normalise_bins = normalise_bins
+        self.dat_scale = dat_scale
+
         # Balance sampling parameters
         if balance_primary is None and balance_secondary is not None:
             raise ValueError(
@@ -198,6 +203,8 @@ class CancerFoundation(pl.LightningModule):
             batchnorm=self.batchnorm,
             cell_emb_style=self.cell_emb_style,
             weight_conditionloss=self.weight_conditionloss,
+            dat_scale=self.dat_scale,
+            normalise_bins=self.normalise_bins,
         )
         if self.compile_model:
             self.model = torch.compile(self.model)

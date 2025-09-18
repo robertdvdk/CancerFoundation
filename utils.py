@@ -356,6 +356,18 @@ def get_args():
         default=1.0,
         help="Weight for the DAT condition loss",
     )
+
+    parser.add_argument(
+        "--dat-scale",
+        type=float,
+        default=1.0,
+        help="Scale for the gradient reversal layer in DAT",
+    )
+
+    parser.add_argument(
+        "--normalise-bins",
+        action="store_true",
+    )
     return parser.parse_args()
 
 

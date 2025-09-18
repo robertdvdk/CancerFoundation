@@ -5,9 +5,9 @@ python pretrain.py \
     --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
-    --embsize 256 \
-    --d-hid 512 \
-    --epochs 15 \
+    --embsize 128 \
+    --d-hid 256 \
+    --epochs 50 \
     --lr 0.0001 \
     --warmup-ratio-or-step 1 \
     --trunc-by-sample \
@@ -15,11 +15,12 @@ python pretrain.py \
     --train-path "./DATA/brain/processed_data/train" \
     --zero-percentages 0.2 0.4 0.6 \
     --conditions "technology" \
-    --balance-primary "tissue" \
-    --balance-secondary "technology" \
+    --balance-primary "technology" \
     --strategy='auto' \
     --grad-accu-steps 1 \
     --seed 0 \
     --training-tasks "pcpt" \
-    --do-dat \
-    --do-mvc
+    --normalise-bins \
+    --do-mvc \
+    --do-dat
+    # --dat-scale 5.0

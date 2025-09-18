@@ -36,7 +36,7 @@ class GradientReverse(Function):
         return GradientReverse.scale * grad_output.neg()
 
 
-def grad_reverse(x: torch.Tensor, scale: float = 1.0) -> torch.Tensor:
+def grad_reverse(x: torch.Tensor, scale: float) -> torch.Tensor:
     """
     Applies the gradient reversal operation to a tensor.
 

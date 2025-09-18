@@ -117,6 +117,7 @@ def main():
         TRUNC_BY_SAMPLE=args.trunc_by_sample,
         training_tasks=args.training_tasks,
         n_bins=args.n_bins,
+        normalise_bins=args.normalise_bins,
     )
     datamodule.setup(stage="fit")
 
@@ -162,6 +163,8 @@ def main():
             batchnorm=args.batchnorm,
             explicit_zero_prob=args.explicit_zero_prob,
             weight_conditionloss=args.weight_conditionloss,
+            dat_scale=args.dat_scale,
+            normalise_bins=args.normalise_bins,
         )
 
     if args.pretrained:
