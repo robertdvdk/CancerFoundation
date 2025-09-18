@@ -331,9 +331,12 @@ class AnnDataCollator:
                 )
 
             if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
-                    row=expressions[self.keep_first_n_tokens :],
-                    n_bins=self.n_bins,
+                expressions[self.keep_first_n_tokens :] = (
+                    binning(
+                        row=expressions[self.keep_first_n_tokens :],
+                        n_bins=self.n_bins,
+                    )
+                    / self.n_bins
                 )
 
             (

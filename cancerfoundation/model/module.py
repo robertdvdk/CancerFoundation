@@ -1091,7 +1091,7 @@ class ExprDecoder(nn.Module):
         pred_value = self.fc(x).squeeze(-1)  # (batch, seq_len)
 
         if not self.explicit_zero_prob:
-            return dict(pred=pred_value)
+            return dict(pred=F.sigmoid(pred_value))
         zero_logits = self.zero_logit(x).squeeze(-1)  # (batch, seq_len)
         zero_probs = torch.sigmoid(zero_logits)
         return dict(pred=pred_value, zero_probs=zero_probs)
@@ -1181,7 +1181,7 @@ class MVCDecoder(nn.Module):
                 pred_value = pred_value.unsqueeze(2)
                 pred_value = self.fc1(pred_value)
             if not self.explicit_zero_prob:
-                return dict(pred=pred_value)
+                return dict(pred=F.sigmoid(pred_value))
             # zero logits need to based on the cell_emb, because of input exprs
             zero_logits = torch.bmm(self.W_zero_logit(query_vecs), cell_emb).squeeze(2)
             zero_probs = torch.sigmoid(zero_logits)
