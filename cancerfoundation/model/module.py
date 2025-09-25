@@ -1,9 +1,10 @@
-from typing import Dict, Mapping, Optional, Union, Type, Callable
+from typing import Dict, Mapping, Optional, Union, Type, Callable, Tuple
 
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from .layers import CFLayer, CFGenerator
 
 from .grad_reverse import grad_reverse
 from torch.nn.attention import SDPBackend, sdpa_kernel
@@ -77,18 +78,22 @@ class TransformerModule(nn.Module):
             pad_value (int): The value used for padding in the input expression values.
             pad_token_id (int): The token ID used for padding.
             criterion: The loss function for expression prediction.
-            dropout (float, optional): The dropout rate. Defaults to 0.0.
-            do_mvc (bool, optional): Whether to include the MVC decoder. Defaults to False.
-            conditions (Dict, optional): A dictionary defining conditional variables, mapping condition names to the number of categories. Defaults to None.
-            input_emb_style (str, optional): The style of input value embedding ("continuous", "category", "scaling"). Defaults to "continuous".
-            n_input_bins (Optional[int], optional): The number of bins for categorical value embedding. Required if `input_emb_style` is "category". Defaults to None.
-            cell_emb_style (str, optional): The method to obtain cell embeddings ("cls", "avg-pool", "w-pool"). Defaults to "cls".
-            mvc_decoder_style (str, optional): The architecture for the MVC decoder. Defaults to "inner product".
-            explicit_zero_prob (bool, optional): Whether to explicitly predict zero-expression probability. Defaults to False.
-            use_generative_training (bool, optional): Whether to use the generative training setup. Defaults to False.
-            pre_norm (bool, optional): Whether to use pre-layer normalization in the transformer. Defaults to False.
-            do_dat (bool, optional): Whether to include Domain Adversarial Training. Defaults to False.
-            batchnorm (bool, optional): Whether to use batch normalization on the input embeddings. Defaults to False.
+            activation (Callable[[Tensor], Tensor]): The activation function for the transformer encoder layers.
+            do_mvc (bool): Whether to include the MVC decoder.
+            dropout (float): The dropout rate.
+            conditions (Dict): A dictionary defining conditional variables, mapping condition names to the number of categories.
+            input_emb_style (str): The style of input value embedding ("continuous", "category", "scaling").
+            n_input_bins (Optional[int]): The number of bins for categorical value embedding. Required if `input_emb_style` is "category".
+            cell_emb_style (str): The method to obtain cell embeddings ("cls", "avg-pool", "w-pool").
+            mvc_decoder_style (str): The architecture for the MVC decoder.
+            explicit_zero_prob (bool): Whether to explicitly predict zero-expression probability.
+            use_generative_training (bool): Whether to use the generative training setup.
+            norm_first (bool): Whether to use pre-layer normalization in the transformer.
+            do_dat (bool): Whether to include Domain Adversarial Training.
+            batchnorm (bool): Whether to use batch normalization on the input embeddings.
+            weight_conditionloss (float): Weight for the condition prediction loss in DAT.
+            dat_scale (float): Scale factor for the gradient reversal layer in DAT.
+            normalise_bins (bool): Whether to apply a sigmoid to the output of the decoders.
         """
         super().__init__()
         self.model_type = "Transformer"
@@ -100,6 +105,7 @@ class TransformerModule(nn.Module):
         self.pad_token_id = pad_token_id
         self.norm_scheme = "pre" if norm_first else "post"
         self.weight_conditionloss = weight_conditionloss
+        self.use_generative_training = use_generative_training
 
         self.n_input_bins = n_input_bins
         if self.input_emb_style not in ["category", "continuous", "scaling"]:
@@ -121,9 +127,7 @@ class TransformerModule(nn.Module):
                 n_input_bins, d_model, padding_idx=pad_value
             )
         else:
-            self.value_encoder = nn.Identity()  # nn.Softmax(dim=1)
-            # TODO: consider row-wise normalization or softmax
-            # TODO: Correct handle the mask_value when using scaling
+            self.value_encoder = nn.Identity()
 
         self.do_dat = do_dat
         self.do_mvc = do_mvc
@@ -142,17 +146,29 @@ class TransformerModule(nn.Module):
                             d_model, n_cls=cond_num, scale=dat_scale
                         )
                     )
+        if use_generative_training:
+            encoder_layers = CFLayer(
+                d_model,
+                nhead,
+                d_hid,
+                dropout,
+                batch_first=True,
+                norm_scheme=self.norm_scheme,
+            )
+            self.transformer_encoder = CFGenerator(encoder_layers, nlayers)
+            self.flag_encoder = nn.Embedding(2, d_model)
+        else:
+            encoder_layers = TransformerEncoderLayer(
+                d_model,
+                nhead,
+                d_hid,
+                dropout,
+                batch_first=True,
+                norm_first=norm_first,
+                activation=activation,
+            )
+            self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
-        encoder_layers = TransformerEncoderLayer(
-            d_model,
-            nhead,
-            d_hid,
-            dropout,
-            batch_first=True,
-            norm_first=norm_first,
-            activation=activation,
-        )
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.decoder = ExprDecoder(
             d_model,
             explicit_zero_prob=explicit_zero_prob,
@@ -192,16 +208,15 @@ class TransformerModule(nn.Module):
             values (Tensor): Input expression values of shape (batch, seq_len).
             src_key_padding_mask (Tensor): Padding mask of shape (batch, seq_len).
             conditions (Optional[Dict], optional): Dictionary of condition tensors. Defaults to None.
-            domain_labels (Optional[Tensor], optional): Domain labels for domain-specific batch normalization. Defaults to None.
 
         Returns:
             Tensor: The output of the Transformer encoder, of shape (batch, seq_len, embsize).
         """
         self._check_condition_labels(conditions)
 
-        self.cur_gene_token_embs = src  # exclude the condition token
+        self.cur_gene_token_embs = src
 
-        values = self.value_encoder(values)  # (batch, seq_len, embsize)
+        values = self.value_encoder(values)
         values = torch.cat(
             [
                 values,
@@ -220,7 +235,88 @@ class TransformerModule(nn.Module):
             total_embs, src_key_padding_mask=src_key_padding_mask
         )
 
-        return output  # (batch, seq_len, embsize)
+        return output
+
+    def transformer_generate(
+        self,
+        pcpt_genes: Tensor,
+        pcpt_values: Tensor,
+        pcpt_key_padding_mask: Tensor,
+        gen_genes: Tensor,
+        gen_key_padding_mask: Tensor,
+        conditions: Optional[Dict] = None,
+        input_cell_emb: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor]:
+        """Processes inputs through the generative transformer model, adding conditions as input tokens.
+
+        Args:
+            pcpt_genes (Tensor): Gene tokens for the perceptual (context) part.
+            pcpt_values (Tensor): Expression values for the perceptual part.
+            pcpt_key_padding_mask (Tensor): Padding mask for the perceptual part.
+            gen_genes (Tensor): Gene tokens for the generative (target) part.
+            gen_key_padding_mask (Tensor): Padding mask for the generative part.
+            conditions (Optional[Dict], optional): Conditional labels. Defaults to None.
+            input_cell_emb (Optional[Tensor], optional): Pre-computed cell embeddings to inject. Defaults to None.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing the transformer output for the perceptual and generative parts, respectively.
+        """
+        self._check_condition_labels(conditions)
+
+        pcpt_token_embs = self.encoder(pcpt_genes)
+        pcpt_values_embs = self.value_encoder(pcpt_values)
+        transformer_pcpt_token_embs = pcpt_token_embs
+
+        if self.conditions:
+            condition_emb = torch.cat(
+                [
+                    self.condition_encoders[cond_name](cond_values).unsqueeze(1)
+                    for cond_name, cond_values in conditions.items()
+                ],
+                dim=1,
+            )
+            transformer_pcpt_token_embs = torch.cat(
+                [pcpt_token_embs, condition_emb], dim=1
+            )
+            zeros_for_conds = torch.zeros_like(condition_emb)
+            pcpt_values_embs = torch.cat([pcpt_values_embs, zeros_for_conds], dim=1)
+            cond_padding_mask = torch.zeros(
+                condition_emb.shape[0],
+                condition_emb.shape[1],
+                dtype=torch.bool,
+                device=pcpt_key_padding_mask.device,
+            )
+            pcpt_key_padding_mask = torch.cat(
+                [pcpt_key_padding_mask, cond_padding_mask], dim=1
+            )
+
+        pcpt_total_embs = transformer_pcpt_token_embs + pcpt_values_embs
+
+        assert self.input_emb_style != "scaling"
+        if gen_genes is not None:
+            gen_token_embs = self.encoder(gen_genes)
+            self.cur_gene_token_embs = torch.cat(
+                [pcpt_token_embs, gen_token_embs], dim=1
+            )
+            gen_flags = self.flag_encoder(
+                torch.tensor(1).to(pcpt_values_embs.device)
+            ).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
+            gen_total_embs = gen_token_embs + gen_flags
+        else:
+            self.cur_gene_token_embs = pcpt_token_embs
+            gen_total_embs = None
+
+        if input_cell_emb is not None:
+            pcpt_total_embs[:, 0, :] = input_cell_emb
+
+        pcpt_output, gen_output = self.transformer_encoder(
+            pcpt_total_embs,
+            gen_total_embs,
+            pcpt_key_padding_mask=pcpt_key_padding_mask,
+            gen_key_padding_mask=gen_key_padding_mask,
+        )
+
+        return pcpt_output, gen_output
 
     def _get_cell_emb_from_layer(
         self, layer_output: Tensor, weights: Optional[Tensor] = None
@@ -276,14 +372,14 @@ class TransformerModule(nn.Module):
         output["cell_emb"] = cell_emb
 
         if self.do_mvc:
-            mvc_output = self.mvc_decoder(
-                cell_emb
-                if not self.conditions
-                else torch.cat(
+            if self.conditions:
+                mvc_input_emb = torch.cat(
                     [cell_emb, condition_emb.view(condition_emb.shape[0], -1)], dim=1
-                ),
-                self.cur_gene_token_embs,
-            )
+                )
+            else:
+                mvc_input_emb = cell_emb
+
+            mvc_output = self.mvc_decoder(mvc_input_emb, self.cur_gene_token_embs)
             output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
 
         if self.do_dat:
@@ -296,6 +392,24 @@ class TransformerModule(nn.Module):
                     output["condition_output"][cond_name] = discriminator(cell_emb)
 
         return output
+
+    def _prepare_generative_input(self, tensors: dict[str, torch.Tensor]):
+        """Prepares tensors for the generative forward pass."""
+        pcpt_gene = tensors["pcpt_gene"]
+        pcpt_expr = tensors["pcpt_expr"]
+        pcpt_key_padding_mask = pcpt_gene.eq(self.pad_token_id)
+        gen_gene = tensors["gen_gene"]
+        gen_expr_target = tensors["gen_expr_target"]
+        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
+
+        return (
+            pcpt_gene,
+            pcpt_expr,
+            pcpt_key_padding_mask,
+            gen_gene,
+            gen_expr_target,
+            gen_key_padding_mask,
+        )
 
     def _prepare_perceptual_input(self, tensors: dict[str, torch.Tensor]):
         """Prepares tensors for the perceptual forward pass."""
@@ -331,29 +445,77 @@ class TransformerModule(nn.Module):
         """
         loss_dict = {}
         conditions_batch = tensors["conditions"] if self.conditions else None
-        input_gene_ids, input_values, src_key_padding_mask, target_values = (
-            self._prepare_perceptual_input(tensors)
-        )
-        output_dict = self.perceptual_forward(
-            input_gene_ids,
-            input_values,
-            src_key_padding_mask=src_key_padding_mask,
-            conditions=conditions_batch,
-        )
-
-        output_values = output_dict["mlm_output"]
-        positions_to_match = ~src_key_padding_mask & (target_values != -2)
-        loss = loss_expr = self.criterion(
-            output_values, target_values, positions_to_match
-        )
-        loss_dict["loss_expr"] = loss_expr
-
-        if self.do_mvc:
-            loss_mvc = self.criterion(
-                output_dict["mvc_output"], target_values, positions_to_match
+        if self.use_generative_training:
+            (
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_expr_target,
+                gen_key_padding_mask,
+            ) = self._prepare_generative_input(tensors)
+            output_dict = self.generative_forward(
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_key_padding_mask,
+                conditions=conditions_batch,
             )
-            loss = loss + loss_mvc
-            loss_dict["loss_mvc"] = loss_mvc
+
+            gen_expr_preds = output_dict["gen_preds"]
+            positions_to_match = ~gen_key_padding_mask
+            loss = loss_expr = self.criterion(
+                gen_expr_preds, gen_expr_target, positions_to_match
+            )
+            loss_dict["loss_expr"] = loss_expr
+
+            if self.do_mvc:
+                mvc_preds_for_gen = output_dict["mvc_output"][:, pcpt_gene.shape[1] :]
+                loss_mvc = self.criterion(
+                    mvc_preds_for_gen, gen_expr_target, positions_to_match
+                )
+                loss = loss + loss_mvc
+                loss_dict["loss_mvc"] = loss_mvc
+
+            previous_cell_embs = output_dict["cell_emb"].detach()
+            preds = self.generative_forward(
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_key_padding_mask,
+                input_cell_emb=previous_cell_embs,
+                conditions=conditions_batch,
+            )["gen_preds"]
+
+            loss_gen = self.criterion(preds, gen_expr_target, positions_to_match)
+            loss = loss + use_cell_embedding * loss_gen
+            loss_dict["loss_gen"] = loss_gen
+        else:  # Perceptual training
+            input_gene_ids, input_values, src_key_padding_mask, target_values = (
+                self._prepare_perceptual_input(tensors)
+            )
+            output_dict = self.perceptual_forward(
+                input_gene_ids,
+                input_values,
+                src_key_padding_mask=src_key_padding_mask,
+                conditions=conditions_batch,
+            )
+
+            output_values = output_dict["mlm_output"]
+            positions_to_match = ~src_key_padding_mask & (target_values != -2)
+            loss = loss_expr = self.criterion(
+                output_values, target_values, positions_to_match
+            )
+            loss_dict["loss_expr"] = loss_expr
+
+            if self.do_mvc:
+                loss_mvc = self.criterion(
+                    output_dict["mvc_output"], target_values, positions_to_match
+                )
+                loss = loss + loss_mvc
+                loss_dict["loss_mvc"] = loss_mvc
 
         if self.do_dat:
             if self.conditions:
@@ -373,15 +535,12 @@ class TransformerModule(nn.Module):
                         .float()
                         .mean()
                     )
-
                     loss += condition_loss / len(self.conditions)
-
                     loss_dict["condition_" + condition] = condition_loss.detach() / len(
                         self.conditions
                     )
 
         loss_dict["total_loss"] = loss
-
         return loss_dict
 
     def training_step(self, batch, batch_idx):
@@ -396,6 +555,78 @@ class TransformerModule(nn.Module):
         """
         loss_dict = self(batch, use_cell_embedding=False)
         return loss_dict["total_loss"]
+
+    def generative_forward(
+        self,
+        pcpt_genes: Tensor,
+        pcpt_values: Tensor,
+        pcpt_key_padding_mask: Tensor,
+        gen_genes: Tensor,
+        gen_key_padding_mask: Tensor,
+        conditions: Optional[Dict] = None,
+        do_sample: bool = False,
+        input_cell_emb: Optional[Tensor] = None,
+    ) -> Mapping[str, Tensor]:
+        """Forward pass for the generative training mode.
+
+        Args:
+            pcpt_genes (Tensor): Token IDs of the perceptual part.
+            pcpt_values (Tensor): Token values of the perceptual part.
+            pcpt_key_padding_mask (Tensor): Mask for pcpt_genes.
+            gen_genes (Tensor): Token IDs of the generative part.
+            gen_key_padding_mask (Tensor): Mask for gen_genes.
+            conditions (Optional[Dict]): Dictionary of condition tensors.
+            do_sample (bool): If True, samples from Bernoulli for zero predictions.
+            input_cell_emb (Optional[Tensor]): Pre-computed cell embeddings to inject.
+
+        Returns:
+            Mapping[str, Tensor]: A dictionary containing predictions and other outputs.
+        """
+        pcpt_output, gen_output = self.transformer_generate(
+            pcpt_genes,
+            pcpt_values,
+            pcpt_key_padding_mask,
+            gen_genes,
+            gen_key_padding_mask,
+            conditions,
+            input_cell_emb=input_cell_emb,
+        )
+        transformer_output = (
+            pcpt_output
+            if gen_output is None
+            else torch.cat([pcpt_output, gen_output], dim=1)
+        )
+
+        condition_emb = None
+        if self.conditions:
+            condition_emb = torch.cat(
+                [
+                    self.condition_encoders[cond_name](cond_values)
+                    for cond_name, cond_values in conditions.items()
+                ],
+                dim=1,
+            ).view(transformer_output.shape[0], -1)
+
+        output = {}
+        decoder_output = self.decoder(transformer_output)
+
+        full_preds = decoder_output["pred"]
+
+        pcpt_out_len = pcpt_output.shape[1]
+        output["pcpt_preds"] = full_preds[:, :pcpt_out_len]
+        output["gen_preds"] = full_preds[:, pcpt_out_len:]
+
+        if self.explicit_zero_prob:
+            output["zero_probs"] = decoder_output["zero_probs"]
+
+        output = self._extend_output(
+            output,
+            transformer_output,
+            condition_emb=condition_emb,
+            do_sample=do_sample,
+        )
+
+        return output
 
     def perceptual_forward(
         self,
@@ -412,12 +643,12 @@ class TransformerModule(nn.Module):
             values (Tensor): Input expression values (with masking), shape [batch_size, seq_len].
             src_key_padding_mask (Tensor): Mask for src, shape [batch_size, seq_len].
             conditions (Optional[Dict], optional): Dictionary of condition tensors. Defaults to None.
-            MVC (bool, optional): If True, computes MVC output. Defaults to False.
             do_sample (bool, optional): If True, samples from Bernoulli for zero predictions. Defaults to False.
 
         Returns:
             Mapping[str, Tensor]: A dictionary containing MLM predictions ('mlm_output'), cell embeddings ('cell_emb'), and other optional outputs.
         """
+        condition_emb = None
         if self.conditions:
             condition_emb = torch.cat(
                 [
@@ -426,17 +657,25 @@ class TransformerModule(nn.Module):
                 ],
                 dim=1,
             )
-            src = self.encoder(src)
-            src = torch.cat([src, condition_emb], dim=1)
-        transformer_output = self.encode(src, values, src_key_padding_mask, conditions)
+            src_embs = self.encoder(src)
+            src_with_cond = torch.cat([src_embs, condition_emb], dim=1)
+            transformer_output = self.encode(
+                src_with_cond, values, src_key_padding_mask, conditions
+            )
+        else:
+            encoded_genes = self.encoder(src)
+            transformer_output = self.encode(
+                encoded_genes, values, src_key_padding_mask, conditions
+            )
+
         output = {}
         mlm_output = self.decoder(transformer_output)
-        output["mlm_output"] = mlm_output["pred"]  # (batch, seq_len)
+        output["mlm_output"] = mlm_output["pred"]
 
         output = self._extend_output(
             output,
             transformer_output,
-            condition_emb=condition_emb if self.conditions else None,
+            condition_emb=(condition_emb if self.conditions else None),
             do_sample=do_sample,
         )
 
