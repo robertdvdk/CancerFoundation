@@ -341,10 +341,19 @@ class AnnDataCollator:
                 )
 
             if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
-                    row=expressions[self.keep_first_n_tokens :],
-                    n_bins=self.n_bins,
-                )
+                if self.normalise_bins:
+                    expressions[self.keep_first_n_tokens :] = (
+                        binning(
+                            row=expressions[self.keep_first_n_tokens :],
+                            n_bins=self.n_bins,
+                        )
+                        / self.n_bins
+                    )  # scale to 0-1
+                else:
+                    expressions[self.keep_first_n_tokens :] = binning(
+                        row=expressions[self.keep_first_n_tokens :],
+                        n_bins=self.n_bins,
+                    )
 
             (
                 gen_genes,

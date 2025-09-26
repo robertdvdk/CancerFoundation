@@ -20,7 +20,6 @@ python pretrain.py \
     --grad-accu-steps 1 \
     --seed 0 \
     --training-tasks "pcpt" \
-    --normalise-bins \
     --do-mvc \
-    --do-dat
-    # --dat-scale 5.0
+    --do-dat \
+    --normalise-bins
