@@ -1,11 +1,149 @@
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.modules.transformer import _get_clones
+
+
+class RefactoredCFGenerator(nn.Module):
+    """
+    A refactored Transformer Encoder that uses standard PyTorch components.
+
+    This module replicates the behavior of the custom CFGenerator by handling
+    the concatenation of perceptual/generative sequences, creating the specific
+    attention mask, and splitting the outputs. This logic is wrapped around
+    a standard `torch.nn.TransformerEncoder`.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        num_layers: int,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+        activation: str = "relu",
+        layer_norm_eps: float = 1e-5,
+        batch_first: bool = True,
+        norm_scheme: str = "post",
+        norm: Optional[nn.Module] = None,
+    ):
+        """
+        Initializes the refactored Transformer Encoder.
+
+        Args:
+            d_model (int): The number of expected features in the input.
+            nhead (int): The number of heads in the multi-head attention models.
+            num_layers (int): The number of sub-encoder-layers in the encoder.
+            dim_feedforward (int): The dimension of the feed-forward network.
+            dropout (float): The dropout value.
+            activation (str): The activation function ('relu' or 'gelu').
+            layer_norm_eps (float): The epsilon value for layer normalization.
+            batch_first (bool): If True, inputs are (batch, seq, feature).
+            norm_scheme (str): The normalization scheme, "pre" or "post".
+            norm (Optional[nn.Module]): An optional final layer normalization.
+        """
+        super().__init__()
+        assert batch_first, "This implementation requires batch_first=True"
+        assert norm_scheme in [
+            "pre",
+            "post",
+        ], "norm_scheme must be either 'pre' or 'post'"
+
+        # Map norm_scheme to the 'norm_first' parameter in the standard layer
+        norm_first = True if norm_scheme == "pre" else False
+
+        # Create a standard Transformer Encoder Layer
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation=activation,
+            layer_norm_eps=layer_norm_eps,
+            batch_first=batch_first,
+            norm_first=norm_first,
+        )
+
+        # Create the standard Transformer Encoder by stacking the layers
+        self.transformer_encoder = nn.TransformerEncoder(
+            encoder_layer=encoder_layer,
+            num_layers=num_layers,
+            norm=norm,
+        )
+
+    def forward(
+        self,
+        pcpt_total_embs: Tensor,
+        gen_total_embs: Optional[Tensor],
+        pcpt_key_padding_mask: Optional[Tensor] = None,
+        gen_key_padding_mask: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Optional[Tensor]]:
+        """
+        Passes the perceptual and generative sequences through the encoder.
+
+        Args:
+            pcpt_total_embs (Tensor): The perceptual sequence embeddings.
+            gen_total_embs (Optional[Tensor]): The generative sequence embeddings.
+            pcpt_key_padding_mask (Optional[Tensor]): Mask for the perceptual sequence.
+            gen_key_padding_mask (Optional[Tensor]): Mask for the generative sequence.
+
+        Returns:
+            A tuple of the final (perceptual_output, generative_output) tensors.
+        """
+        # If there's no generative sequence, process only the perceptual one
+        if gen_total_embs is None:
+            output = self.transformer_encoder(
+                src=pcpt_total_embs, src_key_padding_mask=pcpt_key_padding_mask
+            )
+            return output, None
+
+        # --- Pre-processing Step ---
+        pcpt_seq_len = pcpt_total_embs.shape[1]
+        gen_seq_len = gen_total_embs.shape[1]
+        total_seq_len = pcpt_seq_len + gen_seq_len
+
+        # 1. Concatenate inputs
+        src = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
+
+        # 2. Create the combined key padding mask
+        src_key_padding_mask = None
+        if pcpt_key_padding_mask is not None or gen_key_padding_mask is not None:
+            if pcpt_key_padding_mask is None:
+                pcpt_key_padding_mask = torch.zeros(
+                    pcpt_total_embs.shape[:2], dtype=torch.bool, device=src.device
+                )
+            if gen_key_padding_mask is None:
+                gen_key_padding_mask = torch.zeros(
+                    gen_total_embs.shape[:2], dtype=torch.bool, device=src.device
+                )
+            src_key_padding_mask = torch.cat(
+                (pcpt_key_padding_mask, gen_key_padding_mask), dim=1
+            )
+
+        # 3. Create the custom attention mask (src_mask)
+        # This mask prevents all tokens from attending to the generative tokens.
+        # Shape: (total_seq_len, total_seq_len)
+        src_mask = torch.zeros(
+            total_seq_len, total_seq_len, dtype=torch.bool, device=src.device
+        )
+        src_mask[:, pcpt_seq_len:] = True  # Block attention to generative tokens
+        src_mask.diagonal().fill_(False)  # Allow tokens to attend to themselves
+
+        # --- Call the standard Transformer Encoder ---
+        output = self.transformer_encoder(
+            src=src, mask=src_mask, src_key_padding_mask=src_key_padding_mask
+        )
+
+        # --- Post-processing Step ---
+        # Split the output back into perceptual and generative parts
+        pcpt_output = output[:, :pcpt_seq_len]
+        gen_output = output[:, pcpt_seq_len:]
+
+        return pcpt_output, gen_output
 
 
 class MHA(nn.Module):

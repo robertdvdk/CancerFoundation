@@ -2,7 +2,7 @@ python pretrain.py \
     --gpus 1 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 8 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
@@ -22,4 +22,6 @@ python pretrain.py \
     --training-tasks "pcpt" \
     --do-mvc \
     --do-dat \
-    --normalise-bins
+    --no-invert-dat \
+    --where-condition "begin" \
+    --gen-method "mine"

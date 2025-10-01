@@ -66,6 +66,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         training_tasks: str,
         n_bins: int,
         normalise_bins: bool,
+        condition_token: bool,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -82,6 +83,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         self.n_bins = n_bins
         self.zero_percentages = zero_percentages
         self.normalise_bins = normalise_bins
+        self.condition_token = condition_token
 
         # Setup token values based on embedding style
         if self.input_style == "category":
@@ -153,6 +155,7 @@ class SingleCellDataModule(pl.LightningDataModule):
             n_bins=self.n_bins if self.input_style == "binned" else None,
             conditions=self.conditions,
             zero_percentages=self.zero_percentages,
+            condition_token=self.condition_token,
         )
 
         batch_size = self.batch_size if train else self.batch_size

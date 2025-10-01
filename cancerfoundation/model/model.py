@@ -52,15 +52,17 @@ class CancerFoundation(pl.LightningModule):
         mvc_decoder_style: str,
         scale_zero_expression: Optional[float],
         do_dat: bool,
+        no_invert_dat: bool,
         explicit_zero_prob: Optional[bool],
         balance_primary: Optional[str],
         balance_secondary: Optional[str],
         zero_percentages: Optional[List[float]],
         cell_emb_style: str,
         batchnorm: bool,
-        weight_conditionloss: float,
         dat_scale: float,
         normalise_bins: bool,
+        where_condition: str,
+        gen_method: str,
     ):
         """Initializes the CancerFoundation LightningModule.
 
@@ -126,7 +128,6 @@ class CancerFoundation(pl.LightningModule):
         self.norm_first = norm_first
         self.batchnorm = batchnorm
         self.cell_emb_style = cell_emb_style
-        self.weight_conditionloss = weight_conditionloss
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -139,8 +140,11 @@ class CancerFoundation(pl.LightningModule):
         self.domain_nums = None
         self.explicit_zero_prob = explicit_zero_prob
         self.do_dat = do_dat
+        self.no_invert_dat = no_invert_dat
         self.conditions = conditions
         self.conditions_nums = conditions_nums
+        self.where_condition = where_condition
+        self.gen_method = gen_method
 
         self.normalise_bins = normalise_bins
         self.dat_scale = dat_scale
@@ -167,6 +171,7 @@ class CancerFoundation(pl.LightningModule):
 
         self.pad_token_id = self.vocab["<pad>"]
         self.cls_token_id = self.vocab["<cls>"]
+        self.cond_token_id = self.vocab["<cond>"]
 
         # Initialize dataset and model
         self._setup_model(mvc_decoder_style)
@@ -197,14 +202,17 @@ class CancerFoundation(pl.LightningModule):
             n_input_bins=self.n_input_bins,
             use_generative_training=self.USE_GENERATIVE_TRAINING,
             do_dat=self.do_dat,
+            no_invert_dat=self.no_invert_dat,
             explicit_zero_prob=self.explicit_zero_prob,
             activation=self.activation,
             norm_first=self.norm_first,
             batchnorm=self.batchnorm,
             cell_emb_style=self.cell_emb_style,
-            weight_conditionloss=self.weight_conditionloss,
             dat_scale=self.dat_scale,
             normalise_bins=self.normalise_bins,
+            where_condition=self.where_condition,
+            max_seq_len=self.max_seq_len,
+            gen_method=self.gen_method,
         )
         if self.compile_model:
             self.model = torch.compile(self.model)

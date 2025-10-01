@@ -9,7 +9,6 @@ from cancerfoundation.model.model import CancerFoundation
 from cancerfoundation.data.data_module import SingleCellDataModule
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 
 
@@ -63,8 +62,9 @@ def train_model(
     lr_monitor = LearningRateMonitor(logging_interval="step")
     callbacks.append(lr_monitor)
 
-    # Setup logger
     logger = None
+
+    # logger = None
     global_rank = int(os.environ.get("GLOBAL_RANK", "0"))
     if wandb_project and global_rank == 0:
         logger = WandbLogger(
@@ -76,7 +76,7 @@ def train_model(
 
     # Create trainer
     trainer = pl.Trainer(
-        max_epochs=max_epochs,
+        max_epochs=1,
         accelerator="gpu",
         devices=gpus,
         num_nodes=num_nodes,
@@ -118,6 +118,7 @@ def main():
         training_tasks=args.training_tasks,
         n_bins=args.n_bins,
         normalise_bins=args.normalise_bins,
+        condition_token=args.where_condition == "begin",
     )
     datamodule.setup(stage="fit")
 
@@ -147,6 +148,7 @@ def main():
             scheduler_factor=args.scheduler_factor,
             loss_type=args.loss,
             do_dat=args.do_dat,
+            no_invert_dat=args.no_invert_dat,
             conditions=args.conditions,
             conditions_nums=datamodule.conditions_nums if args.conditions else None,
             mvc_decoder_style=args.mvc_decoder_style,
@@ -162,9 +164,10 @@ def main():
             cell_emb_style=args.cell_emb_style,
             batchnorm=args.batchnorm,
             explicit_zero_prob=args.explicit_zero_prob,
-            weight_conditionloss=args.weight_conditionloss,
             dat_scale=args.dat_scale,
             normalise_bins=args.normalise_bins,
+            where_condition=args.where_condition,
+            gen_method=args.gen_method,
         )
 
     if args.pretrained:

@@ -310,7 +310,7 @@ def get_args():
         "--activation",
         type=str,
         choices=["relu", "gelu"],
-        default="gelu",
+        default="relu",
         help="The activation function to use in the transformer model. Default is gelu.",
     )
 
@@ -351,10 +351,8 @@ def get_args():
     )
 
     parser.add_argument(
-        "--weight-conditionloss",
-        type=float,
-        default=1.0,
-        help="Weight for the DAT condition loss",
+        "--normalise-bins",
+        action="store_true",
     )
 
     parser.add_argument(
@@ -365,9 +363,24 @@ def get_args():
     )
 
     parser.add_argument(
-        "--normalise-bins",
-        action="store_true",
+        "--where-condition",
+        type=str,
+        choices=["begin", "end"],
     )
+
+    parser.add_argument(
+        "--no-invert-dat",
+        action="store_true",
+        help="If doing domain adversarial training, whether to invert the gradients.",
+    )
+
+    parser.add_argument(
+        "--gen-method",
+        type=str,
+        choices=["theirs", "mine"],
+        help="Which method to use for generative training.",
+    )
+
     return parser.parse_args()
 
 

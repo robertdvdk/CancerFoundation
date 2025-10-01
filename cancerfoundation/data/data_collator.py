@@ -42,6 +42,7 @@ class AnnDataCollator:
     """
 
     normalise_bins: bool
+    condition_token: bool
     do_padding: bool = True
     gene_key: str = "var_gene_token"
     pad_token_id: Optional[int] = None
@@ -55,7 +56,7 @@ class AnnDataCollator:
     max_length: Optional[int] = None
     sampling: bool = True
     reserve_keys: List[str] = field(default_factory=lambda: [])
-    keep_first_n_tokens: int = 1
+    keep_first_n_tokens: int = 2
     data_style: str = "pcpt"
     n_bins: int = None
     conditions: List[str] = None
@@ -187,6 +188,7 @@ class AnnDataCollator:
                 expressions,
                 _max_length,
                 zero_percentage=zero_percentage,
+                pcpt=True,
             )  # torch tensors of length _max_length
 
             padded_genes.append(genes)
@@ -365,6 +367,11 @@ class AnnDataCollator:
                 expressions[self.keep_first_n_tokens :],
                 ratio=gen_prob,
             )
+
+            # print(genes[self.keep_first_n_tokens :])
+            # print((genes[self.keep_first_n_tokens :] == 0).float().sum())
+            # print((genes[self.keep_first_n_tokens :] == 1).float().sum())
+            # print((genes[self.keep_first_n_tokens :] == 2).float().sum())
             pcpt_genes = torch.cat(
                 (genes[: self.keep_first_n_tokens], pcpt_genes), dim=0
             )
@@ -379,13 +386,18 @@ class AnnDataCollator:
                 pcpt_expressions,
                 pcpt_length,
                 zero_percentage=zero_percentage,
+                pcpt=True,
             )  # torch tensors of length pcpt_length
 
             padded_pcpt_genes.append(pcpt_genes)
             padded_pcpt_expressions.append(pcpt_expressions)
 
             gen_genes, gen_expressions = self._sample_or_truncate_plus_pad(
-                gen_genes, gen_expressions, gen_length, zero_percentage=zero_percentage
+                gen_genes,
+                gen_expressions,
+                gen_length,
+                zero_percentage=zero_percentage,
+                pcpt=False,
             )  # torch tensors of length gen_length
 
             padded_gen_genes.append(gen_genes)
@@ -559,11 +571,15 @@ class AnnDataCollator:
         genes: torch.LongTensor,
         expressions: torch.Tensor,
         max_length: int,
+        pcpt: bool,
         zero_percentage: Optional[int] = None,
     ) -> Tuple[torch.LongTensor, torch.Tensor]:
         assert len(genes) == len(expressions)
         if len(genes) == max_length:
             return genes, expressions
+
+        if pcpt:
+            max_length += self.keep_first_n_tokens
 
         if len(genes) > max_length:  # sample or truncate
             if self.sampling:
