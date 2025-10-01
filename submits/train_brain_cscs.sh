@@ -14,6 +14,7 @@ SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/users/rvander/project_dir/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
+podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
 podman run \
     -e WANDB_API_KEY \
     --workdir /users/rvander/project_dir/my_prop/CancerFoundation \
@@ -44,12 +45,15 @@ podman run \
     --strategy='ddp' \
     --seed 0 \
     --precision "bf16-mixed" \
-    --training-tasks "pcpt" \
     --do-mvc \
     --do-dat \
-    --compile \
+    --no-invert-dat \
     --log-interval 50 \
-    --normalise-bins
+    --training-tasks "both" \
+    --where-condition "begin" \
+    --gen-method "mine"
+
+
 
 podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
 srun podman run \
