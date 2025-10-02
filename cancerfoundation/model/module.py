@@ -261,24 +261,6 @@ class TransformerModule(nn.Module):
 
         return output
 
-    def on_after_backward(self):
-        """
-        This is a PyTorch Lightning hook.
-        It is called after the loss has been backpropagated but before the optimizer updates the weights.
-        Perfect for checking gradients.
-        """
-        print("--- Checking for unused parameters ---")
-        found_unused = False
-        for name, param in self.named_parameters():
-            if param.grad is None:
-                if param.requires_grad:
-                    found_unused = True
-                    print(f"Unused parameter: {name}")
-
-        if not found_unused:
-            print("No unused parameters found.")
-        print("------------------------------------")
-
     def encode(
         self,
         src: Tensor,
