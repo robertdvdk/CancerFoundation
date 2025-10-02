@@ -797,8 +797,8 @@ class ContinuousValueEncoder(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.pcpt = pcpt
-        if self.pcpt:
-            self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
+        # if self.pcpt:
+        #     self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
         self.activation = nn.ReLU()
@@ -816,7 +816,7 @@ class ContinuousValueEncoder(nn.Module):
             Tensor: The resulting embeddings of shape (batch, seq_len, d_model).
         """
         expression_mask = x >= 0
-        masked_expression_mask = x == -1
+        # masked_expression_mask = x == -1
 
         embeddings = torch.zeros(x.shape[0], x.shape[1], self.d_model, device=x.device)
 
@@ -833,8 +833,8 @@ class ContinuousValueEncoder(nn.Module):
         )
         embeddings[expression_mask] = expression_embs
 
-        if self.pcpt:
-            embeddings[masked_expression_mask] = self.masked_expression_embedding
+        # if self.pcpt:
+        #     embeddings[masked_expression_mask] = self.masked_expression_embedding
         return embeddings
 
 
