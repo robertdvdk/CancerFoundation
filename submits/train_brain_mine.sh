@@ -14,6 +14,7 @@ SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/users/rvander/project_dir/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
+podman system migrate
 podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
 srun podman run \
     -e WANDB_API_KEY \
