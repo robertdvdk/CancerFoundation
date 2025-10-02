@@ -796,7 +796,8 @@ class ContinuousValueEncoder(nn.Module):
     ):
         super().__init__()
         self.d_model = d_model
-        if pcpt:
+        self.pcpt = pcpt
+        if self.pcpt:
             self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
@@ -819,23 +820,20 @@ class ContinuousValueEncoder(nn.Module):
 
         embeddings = torch.zeros(x.shape[0], x.shape[1], self.d_model, device=x.device)
 
-        if expression_mask.any():
-            expression_embs = self.dropout(
-                self.norm(
-                    self.linear2(
-                        self.activation(
-                            self.linear1(
-                                x[expression_mask]
-                                .unsqueeze(-1)
-                                .clamp(max=self.max_value)
-                            )
+        expression_embs = self.dropout(
+            self.norm(
+                self.linear2(
+                    self.activation(
+                        self.linear1(
+                            x[expression_mask].unsqueeze(-1).clamp(max=self.max_value)
                         )
                     )
                 )
             )
-            embeddings[expression_mask] = expression_embs
+        )
+        embeddings[expression_mask] = expression_embs
 
-        if masked_expression_mask.sum() > 0:
+        if self.pcpt:
             embeddings[masked_expression_mask] = self.masked_expression_embedding
         return embeddings
 
