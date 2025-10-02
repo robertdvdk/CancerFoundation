@@ -27,7 +27,7 @@ srun podman run \
     --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 64 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \

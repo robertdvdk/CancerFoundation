@@ -835,7 +835,7 @@ class ContinuousValueEncoder(nn.Module):
             )
             embeddings[expression_mask] = expression_embs
 
-        if masked_expression_mask.any():
+        if masked_expression_mask.sum() > 0:
             embeddings[masked_expression_mask] = self.masked_expression_embedding
         return embeddings
 
