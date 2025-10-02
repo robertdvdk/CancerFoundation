@@ -4,8 +4,8 @@
 #SBATCH --time=07:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-task=2
-#SBATCH --cpus-per-task=64
+#SBATCH --gpus-per-task=1
+#SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
 set -e
@@ -29,7 +29,7 @@ srun podman run \
     --rm \
     nvcr.io/nvidia/clara/bionemo-framework:nightly \
     python pretrain.py \
-    --gpus 2 \
+    --gpus 1 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 64 \
