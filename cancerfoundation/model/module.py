@@ -789,16 +789,19 @@ class GeneEncoder(nn.Module):
 
 
 class ContinuousValueEncoder(nn.Module):
-    """Embeds continuous gene expression values using a small feed-forward network. Used when the input values aren't binned."""
+    """
+    Embeds continuous gene expression values using a small feed-forward network.
+    This version is rewritten to be compatible with `torch.compile`.
+    """
 
     def __init__(
         self, d_model: int, pcpt: bool, dropout: float = 0.1, max_value: int = 512
     ):
         super().__init__()
         self.d_model = d_model
-        self.pcpt = pcpt
-        # if self.pcpt:
-        #     self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
+        if pcpt:
+            # This embedding is used for values of -1, indicating a masked gene.
+            self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
         self.activation = nn.ReLU()
@@ -807,35 +810,53 @@ class ContinuousValueEncoder(nn.Module):
         self.max_value = max_value
 
     def forward(self, x: Tensor) -> Tensor:
-        """Embeds a batch of continuous expression values.
+        """
+        Embeds a batch of continuous expression values using a compiler-friendly,
+        functional approach.
 
         Args:
             x (Tensor): A tensor of expression values of shape (batch, seq_len).
+                        Values >= 0 are gene expressions.
+                        Value == -1 indicates a masked gene.
 
         Returns:
             Tensor: The resulting embeddings of shape (batch, seq_len, d_model).
         """
-        expression_mask = x >= 0
-        # masked_expression_mask = x == -1
-
-        embeddings = torch.zeros(x.shape[0], x.shape[1], self.d_model, device=x.device)
-
-        expression_embs = self.dropout(
-            self.norm(
-                self.linear2(
-                    self.activation(
-                        self.linear1(
-                            x[expression_mask].unsqueeze(-1).clamp(max=self.max_value)
-                        )
-                    )
-                )
-            )
+        # --- 1. Perform the main computation on the entire tensor ---
+        # Instead of filtering with a mask, we compute embeddings for all positions.
+        # This creates a static computation graph. Negative values are clamped to 0
+        # so they produce a consistent "zero embedding" that can be discarded later.
+        x_processed = x.unsqueeze(-1).clamp(min=0, max=self.max_value)
+        expression_embs_full = self.dropout(
+            self.norm(self.linear2(self.activation(self.linear1(x_processed))))
         )
-        embeddings[expression_mask] = expression_embs
 
-        # if self.pcpt:
-        #     embeddings[masked_expression_mask] = self.masked_expression_embedding
-        return embeddings
+        # --- 2. Create boolean masks for selection ---
+        # The masks must be unsqueezed to broadcast correctly with the embeddings tensor.
+        is_expression = (x >= 0).unsqueeze(-1)
+
+        # --- 3. Select the final output using torch.where ---
+        # This replaces the conditional logic and in-place assignments. It's a single,
+        # functional operation that the compiler can heavily optimize.
+
+        # Start with a default tensor of zeros for any values that don't meet other conditions.
+        output_embeddings = torch.zeros_like(expression_embs_full)
+
+        # If the masked embedding is defined, use it for positions where x is -1.
+        if hasattr(self, "masked_expression_embedding"):
+            is_masked = (x == -1).unsqueeze(-1)
+            output_embeddings = torch.where(
+                is_masked, self.masked_expression_embedding, output_embeddings
+            )
+
+        # Finally, for all positions where x represents a valid gene expression,
+        # select the values we computed in step 1. Otherwise, keep the existing value
+        # (which will be either the masked embedding or zero).
+        output_embeddings = torch.where(
+            is_expression, expression_embs_full, output_embeddings
+        )
+
+        return output_embeddings
 
 
 class CategoricalValueEncoder(nn.Module):
