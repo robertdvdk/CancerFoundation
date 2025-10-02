@@ -3,9 +3,8 @@
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=07:00:00
 #SBATCH --partition=normal
-#SBATCH --ntasks=2
-#SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=32
+#SBATCH --gpus=2
+#SBATCH --cpus-per-task=64
 #SBATCH --account=a132
 
 set -e
