@@ -255,25 +255,6 @@ class CancerFoundation(pl.LightningModule):
 
         return loss_dict["total_loss"]
 
-    # <<< INSERT THE DEBUGGING METHOD HERE >>>
-    def on_after_backward(self):
-        """
-        This hook is called by PyTorch Lightning after loss.backward()
-        and before the optimizer steps.
-        """
-        print("--- Checking for unused parameters ---")
-        found_unused = False
-        # Note: We use self.model.named_parameters() because the model is an attribute
-        # of our LightningModule.
-        for name, param in self.model.named_parameters():
-            if param.grad is None and param.requires_grad:
-                found_unused = True
-                print(f"Unused parameter found: {name}")
-
-        if not found_unused:
-            print("No unused parameters found.")
-        print("------------------------------------")
-
     def validation_step(self, batch, batch_idx):
         """Performs a single validation step.
 
