@@ -1,9 +1,9 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_baseline
+#SBATCH --job-name=train_brain_base
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=07:00:00
 #SBATCH --partition=normal
-#SBATCH --ntasks=1
+#SBATCH --ntasks=2
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
@@ -24,7 +24,7 @@ srun podman run \
     --rm \
     nvcr.io/nvidia/clara/bionemo-framework:nightly \
     python pretrain.py \
-    --gpus 1 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 32 \
@@ -47,12 +47,12 @@ srun podman run \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
     --precision "bf16-mixed" \
-    --training-tasks "pcpt" \
     --do-mvc \
-    --do-dat \
     --compile \
     --log-interval 50 \
-    --normalise-bins
+    --training-tasks "both" \
+    --where-condition "end" \
+    --gen-method "theirs"
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
