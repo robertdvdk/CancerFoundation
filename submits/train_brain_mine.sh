@@ -1,9 +1,10 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain
+#SBATCH --job-name=train_brain_mine
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=07:00:00
 #SBATCH --partition=normal
-#SBATCH --gpus=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-task=2
 #SBATCH --cpus-per-task=64
 #SBATCH --account=a132
 
@@ -51,7 +52,8 @@ srun podman run \
     --log-interval 50 \
     --training-tasks "both" \
     --where-condition "end" \
-    --gen-method "theirs"
+    --gen-method "mine" \
+    --compile
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
