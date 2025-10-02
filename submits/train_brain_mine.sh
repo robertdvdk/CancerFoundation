@@ -4,8 +4,8 @@
 #SBATCH --time=07:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=32
+#SBATCH --gpus-per-task=2
+#SBATCH --cpus-per-task=64
 #SBATCH --account=a132
 
 set -e
@@ -18,7 +18,6 @@ SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/users/rvander/project_dir/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
-podman system migrate
 podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
 srun podman run \
     -e WANDB_API_KEY \
@@ -29,7 +28,7 @@ srun podman run \
     --rm \
     nvcr.io/nvidia/clara/bionemo-framework:nightly \
     python pretrain.py \
-    --gpus 1 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 64 \
