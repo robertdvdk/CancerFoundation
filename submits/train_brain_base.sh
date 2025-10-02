@@ -10,6 +10,10 @@
 
 set -e
 
+echo "Running podman system migrate to clean up any stale state..."
+podman system migrate || echo "Migrate failed, but continuing anyway."
+echo "Cleanup finished."
+
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/users/rvander/project_dir/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
