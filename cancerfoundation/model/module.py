@@ -124,7 +124,9 @@ class TransformerModule(nn.Module):
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if input_emb_style == "continuous":
-            self.value_encoder = ContinuousValueEncoder(d_model, dropout)
+            self.value_encoder = ContinuousValueEncoder(
+                d_model=d_model, pcpt=not use_generative_training, dropout=dropout
+            )
         elif input_emb_style == "category":
             assert n_input_bins > 0
             self.value_encoder = CategoricalValueEncoder(
@@ -781,10 +783,13 @@ class GeneEncoder(nn.Module):
 class ContinuousValueEncoder(nn.Module):
     """Embeds continuous gene expression values using a small feed-forward network. Used when the input values aren't binned."""
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512):
+    def __init__(
+        self, d_model: int, pcpt: bool, dropout: float = 0.1, max_value: int = 512
+    ):
         super().__init__()
         self.d_model = d_model
-        self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
+        if pcpt:
+            self.masked_expression_embedding = nn.Parameter(torch.randn(d_model))
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
         self.activation = nn.ReLU()

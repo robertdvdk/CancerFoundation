@@ -2,7 +2,7 @@ python pretrain.py \
     --gpus 1 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 8 \
+    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
@@ -13,15 +13,16 @@ python pretrain.py \
     --trunc-by-sample \
     --loss "mse" \
     --train-path "./DATA/brain/processed_data/train" \
-    --zero-percentages 0.2 0.4 0.6 \
     --conditions "technology" \
     --balance-primary "technology" \
-    --strategy='auto' \
-    --grad-accu-steps 1 \
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp' \
     --seed 0 \
-    --training-tasks "pcpt" \
+    --precision "bf16-mixed" \
     --do-mvc \
     --do-dat \
     --no-invert-dat \
+    --log-interval 50 \
+    --training-tasks "both" \
     --where-condition "begin" \
     --gen-method "mine"

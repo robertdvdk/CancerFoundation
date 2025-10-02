@@ -368,10 +368,6 @@ class AnnDataCollator:
                 ratio=gen_prob,
             )
 
-            # print(genes[self.keep_first_n_tokens :])
-            # print((genes[self.keep_first_n_tokens :] == 0).float().sum())
-            # print((genes[self.keep_first_n_tokens :] == 1).float().sum())
-            # print((genes[self.keep_first_n_tokens :] == 2).float().sum())
             pcpt_genes = torch.cat(
                 (genes[: self.keep_first_n_tokens], pcpt_genes), dim=0
             )

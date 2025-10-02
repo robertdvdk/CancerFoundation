@@ -26,5 +26,7 @@ lightning_logs/
 *.pth
 *.tar
 *.hkl
+*.pkl
+*.zip
 
 *.code-workspace

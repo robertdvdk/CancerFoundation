@@ -35,7 +35,12 @@
 				"mechatroner.rainbow-csv",
 				"rioj7.command-variable",
 				"njpwerner.autodocstring"
-			]
+			],
+
+		// ADD THIS BLOCK TO EXPLICITLY SET THE PYTHON PATH
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/bin/python3"
+			}
 		}
 	}
 }
