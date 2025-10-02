@@ -56,7 +56,7 @@ class AnnDataCollator:
     max_length: Optional[int] = None
     sampling: bool = True
     reserve_keys: List[str] = field(default_factory=lambda: [])
-    keep_first_n_tokens: int = 2
+    keep_first_n_tokens: int = 1
     data_style: str = "pcpt"
     n_bins: int = None
     conditions: List[str] = None

@@ -341,8 +341,17 @@ class TransformerModule(nn.Module):
                 ],
                 dim=0,
             )
-            pcpt_total_embs[:, 1, :] += condition_emb
-            assert pcpt_genes[:, 1].eq(2).all()
+            pcpt_key_padding_mask = torch.nn.functional.pad(
+                pcpt_key_padding_mask, (1, 0), "constant", False
+            )
+            pcpt_total_embs = torch.cat(
+                [
+                    pcpt_total_embs[:, 0, :].unsqueeze(1),
+                    condition_emb.unsqueeze(1),
+                    pcpt_total_embs[:, 1:, :],
+                ],
+                dim=1,
+            )
 
         assert self.input_emb_style != "scaling"
 
@@ -651,14 +660,13 @@ class TransformerModule(nn.Module):
             if self.where_condition == "end":
                 decoder_input = torch.cat(
                     [
+                        transformer_output,
                         condition_emb.unsqueeze(1).repeat(
                             1, transformer_output.shape[1], 1
                         ),
-                        transformer_output,
                     ],
                     dim=2,
                 )
-
         output = {}
         decoder_output = self.decoder(decoder_input)
 

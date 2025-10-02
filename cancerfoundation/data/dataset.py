@@ -84,13 +84,6 @@ class SingleCellDataset(Dataset):
     def _load_vocab(self) -> dict[str, int]:
         with open(self.data_dir.vocab_path, "r") as f:
             vocab = json.load(f)
-        if "<cond>" not in vocab:
-            for key, value in vocab.items():
-                if value >= 2:
-                    vocab[key] = value + 1
-        vocab["<cond>"] = 2
-        # with open(self.data_dir.vocab_path, "r") as f:
-        #     vocab = json.load(f)
         return vocab
 
     def get_metadata(self, key: str) -> np.array:
@@ -106,9 +99,6 @@ class SingleCellDataset(Dataset):
 
         genes = np.insert(genes[0], 0, self.vocab["<cls>"])
         exp = np.insert(exp, 0, self.pad_value)
-
-        genes = np.insert(genes, 1, self.vocab["<cond>"])
-        exp = np.insert(exp, 1, self.pad_value)
 
         data = {
             "expressions": torch.Tensor(exp).type(torch.float32),

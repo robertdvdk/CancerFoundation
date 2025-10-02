@@ -171,7 +171,6 @@ class CancerFoundation(pl.LightningModule):
 
         self.pad_token_id = self.vocab["<pad>"]
         self.cls_token_id = self.vocab["<cls>"]
-        self.cond_token_id = self.vocab["<cond>"]
 
         # Initialize dataset and model
         self._setup_model(mvc_decoder_style)

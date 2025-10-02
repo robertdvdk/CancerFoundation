@@ -1,9 +1,9 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_baseline
+#SBATCH --job-name=train_brain
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=07:00:00
 #SBATCH --partition=normal
-#SBATCH --ntasks=1
+#SBATCH --ntasks=2
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
@@ -15,47 +15,6 @@ TRAIN_DIR="/users/rvander/project_dir/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
-podman run \
-    -e WANDB_API_KEY \
-    --workdir /users/rvander/project_dir/my_prop/CancerFoundation \
-    --volume /users/rvander/project_dir/my_prop/CancerFoundation:/users/rvander/project_dir/my_prop/CancerFoundation \
-    --volume /users/rvander/project_dir/DATA/brain/processed_data/train:/users/rvander/project_dir/DATA/brain/processed_data/train \
-    --gpus $CUDA_VISIBLE_DEVICES \
-    --rm \
-    nvcr.io/nvidia/clara/bionemo-framework:nightly \
-    python pretrain.py \
-    --gpus 1 \
-    --save-dir "QQQ" \
-    --max-seq-len 1200 \
-    --batch-size 32 \
-    --nlayers 6 \
-    --nheads 8 \
-    --embsize 128 \
-    --d-hi 256 \
-    --epochs 50 \
-    --lr 0.0001 \
-    --warmup-ratio-or-step 10000 \
-    --val-check-interval 0.5 \
-    --trunc-by-sample \
-    --loss mse \
-    --conditions "technology" \
-    --balance-primary technology \
-    --train-path "/users/rvander/project_dir/DATA/brain/processed_data/train" \
-    --zero-percentages 0.2 0.4 0.6 \
-    --strategy='ddp' \
-    --seed 0 \
-    --precision "bf16-mixed" \
-    --do-mvc \
-    --do-dat \
-    --no-invert-dat \
-    --log-interval 50 \
-    --training-tasks "both" \
-    --where-condition "begin" \
-    --gen-method "mine"
-
-
-
-podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
 srun podman run \
     -e WANDB_API_KEY \
     --workdir /users/rvander/project_dir/my_prop/CancerFoundation \
@@ -65,7 +24,7 @@ srun podman run \
     --rm \
     nvcr.io/nvidia/clara/bionemo-framework:nightly \
     python pretrain.py \
-    --gpus 1 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 32 \
@@ -88,12 +47,12 @@ srun podman run \
     --wandb "brain" \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
     --precision "bf16-mixed" \
-    --training-tasks "pcpt" \
     --do-mvc \
-    --do-dat \
     --compile \
     --log-interval 50 \
-    --normalise-bins
+    --training-tasks "both" \
+    --where-condition "end" \
+    --gen-method "theirs"
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
