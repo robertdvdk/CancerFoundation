@@ -78,7 +78,7 @@ def train_model(
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         accelerator="gpu",
-        devices="auto",
+        devices=2,
         num_nodes=num_nodes,
         strategy=strategy,
         precision=precision,
