@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_mine
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=07:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-task=2
