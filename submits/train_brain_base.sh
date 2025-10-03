@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_base
 #SBATCH --output=/capstor/scratch/cscs/rvander/save/%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-task=2
@@ -53,7 +53,6 @@ srun podman run \
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
     --precision "bf16-mixed" \
     --do-mvc \
-    --compile \
     --log-interval 50 \
     --training-tasks "both" \
     --where-condition "end" \
