@@ -1,11 +1,11 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_base
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=32
+#SBATCH --gpus-per-task=2
+#SBATCH --cpus-per-task=64
 #SBATCH --account=a132
 
 set -e
@@ -28,7 +28,7 @@ srun podman run \
     --rm \
     nvcr.io/nvidia/clara/bionemo-framework:nightly \
     python pretrain.py \
-    --gpus 1 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 64 \
@@ -42,7 +42,6 @@ srun podman run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
-    --conditions "technology" \
     --balance-primary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
@@ -55,7 +54,6 @@ srun podman run \
     --compile \
     --log-interval 50 \
     --training-tasks "both" \
-    --where-condition "end" \
     --gen-method "theirs" \
     --compile
 

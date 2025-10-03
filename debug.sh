@@ -13,7 +13,6 @@ python pretrain.py \
     --trunc-by-sample \
     --loss "mse" \
     --train-path "./DATA/brain/processed_data/train" \
-    --conditions "technology" \
     --balance-primary "technology" \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='ddp' \
@@ -22,5 +21,4 @@ python pretrain.py \
     --do-mvc \
     --log-interval 50 \
     --training-tasks "both" \
-    --where-condition "end" \
     --gen-method "theirs"
