@@ -20,7 +20,6 @@ srun -ul --environment=./test.toml bash -c "
     LOCAL_RANK=\${SLURM_LOCALID} \
     WORLD_SIZE=\${SLURM_NTASKS} \
     python pretrain.py \
-        --gpus 2 \
         --save-dir "$TEMP_SAVE_DIR" \
         --max-seq-len 1200 \
         --batch-size 64 \
