@@ -10,7 +10,6 @@ from cancerfoundation.data.data_module import SingleCellDataModule
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from lightning.fabric import Fabric
 
 
 def train_model(
@@ -79,7 +78,7 @@ def train_model(
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         accelerator="gpu",
-        devices="auto",
+        devices=1,
         num_nodes=num_nodes,
         strategy=strategy,
         precision=precision,
@@ -91,7 +90,7 @@ def train_model(
         log_every_n_steps=log_interval,
         enable_progress_bar=True,
         enable_model_summary=True,
-        use_distributed_sampler=False,
+        # use_distributed_sampler=False,
     )
 
     # Start training
@@ -101,9 +100,6 @@ def train_model(
 
 
 def main():
-    fabric = Fabric(accelerator="cuda", devices=2, num_nodes=1)
-    fabric.launch()
-
     args = get_args()
     if args.seed is not None:
         pl.seed_everything(args.seed, workers=True)
