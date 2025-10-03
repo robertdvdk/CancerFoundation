@@ -215,7 +215,7 @@ class TransformerModule(nn.Module):
                 normalise_bins=normalise_bins,
             )
 
-        self.init_weights()
+        # self.init_weights()
 
     def init_weights(self) -> None:
         """Initializes the weights of the gene embedding layer."""
