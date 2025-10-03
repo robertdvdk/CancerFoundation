@@ -20,7 +20,7 @@ srun -ul --environment=./test.toml bash -c "
     LOCAL_RANK=\${SLURM_LOCALID} \
     WORLD_SIZE=\${SLURM_NTASKS} \
     python pretrain.py \
-        --save-dir "$TEMP_SAVE_DIR" \
+        --save-dir "/iopsstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
         --max-seq-len 1200 \
         --batch-size 64 \
         --nlayers 6 \
@@ -35,7 +35,7 @@ srun -ul --environment=./test.toml bash -c "
         --loss mse \
         --conditions "technology" \
         --balance-primary technology \
-        --train-path "$TRAIN_DIR" \
+        --train-path "/iopsstor/scratch/cscs/rvander/DATA/brain/processed_data/train" \
         --zero-percentages 0.2 0.4 0.6 \
         --strategy='ddp' \
         --seed 0 \
