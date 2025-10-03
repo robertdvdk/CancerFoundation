@@ -78,7 +78,7 @@ def train_model(
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         accelerator="gpu",
-        devices=2,
+        devices="auto",
         num_nodes=num_nodes,
         strategy=strategy,
         precision=precision,
@@ -90,7 +90,7 @@ def train_model(
         log_every_n_steps=log_interval,
         enable_progress_bar=True,
         enable_model_summary=True,
-        # use_distributed_sampler=False,
+        use_distributed_sampler=False,
     )
 
     # Start training

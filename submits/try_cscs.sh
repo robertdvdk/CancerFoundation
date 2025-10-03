@@ -5,6 +5,7 @@
 #SBATCH --time=00:15:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:2
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=32
 #SBATCH --output=logs/slurm-%x-%j.log
