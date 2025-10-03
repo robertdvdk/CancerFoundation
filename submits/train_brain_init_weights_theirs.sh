@@ -15,7 +15,7 @@ podman system migrate || echo "Migrate failed, but continuing anyway."
 echo "Cleanup finished."
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/users/rvander/project_dir/DATA/brain/processed_data/train"
+TRAIN_DIR="/iopsstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 podman load -i /users/rvander/project_dir/images/bionemo-framework_nightly.tar
