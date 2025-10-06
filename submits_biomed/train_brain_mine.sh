@@ -6,6 +6,7 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:rtx4090:2
 #SBATCH --cpus-per-task=15
+#SBATCH --exclude=gpu-biomed-05,gpu-biomed-25
 
 set -e
 
