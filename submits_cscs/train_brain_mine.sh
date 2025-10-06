@@ -62,7 +62,7 @@ srun podman run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
-    --conditions "technology" \
+    --conditions technology \
     --balance-primary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \

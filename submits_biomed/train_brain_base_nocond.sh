@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_base
+#SBATCH --job-name=train_brain_base_nocond
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=04:00:00
 #SBATCH --partition=gpu
@@ -33,7 +33,6 @@ srun singularity run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
-    --conditions technology \
     --balance-primary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
@@ -45,7 +44,6 @@ srun singularity run \
     --do-mvc \
     --log-interval 50 \
     --training-tasks "both" \
-    --where-condition "end" \
     --gen-method "theirs" \
     --compile
 
