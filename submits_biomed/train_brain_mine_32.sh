@@ -10,6 +10,40 @@
 
 set -e
 
+srun singularity run \
+    --pwd /cluster/work/boeva/rvander/my_prop/CancerFoundation \
+    --bind /cluster/work/boeva/rvander/my_prop/CancerFoundation:/cluster/work/boeva/rvander/my_prop/CancerFoundation \
+    --bind /cluster/dataset/boeva/rvander/DATA/brain/processed_data/train:/cluster/dataset/boeva/rvander/DATA/brain/processed_data/train \
+    --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
+    python pretrain.py \
+    --gpus 1 \
+    --save-dir "QQQQQ" \
+    --max-seq-len 1200 \
+    --batch-size 32 \
+    --nlayers 6 \
+    --nheads 8 \
+    --embsize 128 \
+    --d-hi 256 \
+    --epochs 50 \
+    --lr 0.0001 \
+    --warmup-ratio-or-step 10000 \
+    --val-check-interval 0.5 \
+    --trunc-by-sample \
+    --loss mse \
+    --conditions technology \
+    --balance-primary technology \
+    --train-path "/cluster/dataset/boeva/rvander/DATA/brain/processed_data/train" \
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp' \
+    --seed 0 \
+    --precision "bf16-mixed" \
+    --do-mvc \
+    --log-interval 50 \
+    --training-tasks "both" \
+    --where-condition "end" \
+    --gen-method "mine" \
+    --compile
+
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/cluster/dataset/boeva/rvander/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
@@ -20,7 +54,7 @@ srun singularity run \
     --bind $TRAIN_DIR:$TRAIN_DIR \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
-    --gpus 2 \
+    --gpus 1 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 32 \

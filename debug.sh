@@ -2,7 +2,7 @@ python pretrain.py \
     --gpus 1 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 4 \
+    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
@@ -21,4 +21,5 @@ python pretrain.py \
     --do-mvc \
     --log-interval 50 \
     --training-tasks "both" \
-    --gen-method "theirs"
+    --gen-method "mine" \
+    --compile
