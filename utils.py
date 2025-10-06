@@ -219,6 +219,7 @@ def get_args():
     )
     parser.add_argument(
         "--conditions",
+        type=str,
         nargs="+",
         default=None,
         help="The conditions (obs keys) the model should be invariant to.",

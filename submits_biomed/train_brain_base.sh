@@ -1,6 +1,6 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_mine
-#SBATCH --output=/iopsstor/scratch/cscs/rvander/save/%x_%j.out
+#SBATCH --job-name=train_brain_base
+#SBATCH --output=/capstor/scratch/cscs/rvander/save/%x_%j.out
 #SBATCH --time=04:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
@@ -14,11 +14,11 @@ echo "Running podman system migrate to clean up any stale state..."
 podman system migrate || echo "Migrate failed, but continuing anyway."
 echo "Cleanup finished."
 
-TEMP_SAVE_DIR="/iopsstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/iopsstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
+TEMP_SAVE_DIR="/capstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
 mkdir -p "$TEMP_SAVE_DIR"
 
-podman load -i /iopsstor/scratch/cscs/rvander/images/bionemo-framework_nightly.tar
+podman load -i /capstor/scratch/cscs/rvander/images/bionemo-framework_nightly.tar
 srun podman run \
     -e WANDB_API_KEY \
     --workdir /users/rvander/project_dir/my_prop/CancerFoundation \
@@ -43,7 +43,7 @@ srun podman run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
-    --conditions "technology" \
+    --conditions technology \
     --balance-primary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
@@ -56,7 +56,7 @@ srun podman run \
     --log-interval 50 \
     --training-tasks "both" \
     --where-condition "end" \
-    --gen-method "mine" \
+    --gen-method "theirs" \
     --compile
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
@@ -68,7 +68,7 @@ fi
 
 cp "$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
-mv "/iopsstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
+mv "/capstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 mv "$TEMP_SAVE_DIR"/* "$SAVE_DIR"/
 rm -r "$TEMP_SAVE_DIR"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"

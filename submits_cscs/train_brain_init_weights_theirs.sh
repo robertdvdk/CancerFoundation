@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_base
+#SBATCH --job-name=train_brain_init_weights_theirs
 #SBATCH --output=/capstor/scratch/cscs/rvander/save/%x_%j.out
 #SBATCH --time=04:00:00
 #SBATCH --partition=normal
