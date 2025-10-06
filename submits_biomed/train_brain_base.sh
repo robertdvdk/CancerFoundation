@@ -14,8 +14,8 @@ TRAIN_DIR="/cluster/home/rvander/DATA/brain/processed_data/train"
 mkdir -p "$SAVE_DIR"
 
 srun singularity run \
-    --pwd /cluster/work/boeva/rvander/CancerFoundation \
-    --bind /cluster/work/boeva/rvander/CancerFoundation:/cluster/work/boeva/rvander/CancerFoundation \
+    --pwd /cluster/work/boeva/rvander/my_prop/CancerFoundation \
+    --bind /cluster/work/boeva/rvander/my_prop/CancerFoundation:/cluster/work/boeva/rvander/my_prop/CancerFoundation \
     --bind /cluster/home/rvander/DATA/brain/:/cluster/home/rvander/DATA/brain/ \
     --nv /cluster/customapps/biomed/boeva/fbarkmann/bionemo-framework_nightly.sif \
     python pretrain.py \
