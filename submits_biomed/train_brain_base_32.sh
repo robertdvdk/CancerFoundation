@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_mine
+#SBATCH --job-name=train_brain_base_32
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=04:00:00
 #SBATCH --partition=gpu
@@ -23,7 +23,7 @@ srun singularity run \
     --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 64 \
+    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
@@ -47,7 +47,7 @@ srun singularity run \
     --log-interval 50 \
     --training-tasks "both" \
     --where-condition "end" \
-    --gen-method "mine" \
+    --gen-method "theirs" \
     --compile
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
