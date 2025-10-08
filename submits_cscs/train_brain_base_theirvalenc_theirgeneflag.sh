@@ -8,21 +8,19 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --account=a132
 
-set -e
+set -x
+
+ulimit -c 0
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
+TRAIN_DIR="/iopsstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
 
-podman load -i /capstor/scratch/cscs/rvander/images/bionemo-framework_nightly.tar
-srun podman run \
-    -e WANDB_API_KEY \
-    --workdir /users/rvander/project_dir/my_prop/CancerFoundation \
-    --volume /users/rvander/project_dir/my_prop/CancerFoundation:/users/rvander/project_dir/my_prop/CancerFoundation \
-    --volume $TEMP_SAVE_DIR:$TEMP_SAVE_DIR \
-    --volume $TRAIN_DIR:$TRAIN_DIR \
-    --gpus $CUDA_VISIBLE_DEVICES \
-    --rm \
-    nvcr.io/nvidia/clara/bionemo-framework:nightly \
+srun -ul --environment=./bionemo.toml bash -c "
+    MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \
+    MASTER_PORT=29500 \
+    RANK=\${SLURM_PROCID} \
+    LOCAL_RANK=\${SLURM_LOCALID} \
+    WORLD_SIZE=\${SLURM_NTASKS} \
     python pretrain.py \
     --gpus 2 \
     --save-dir "$SAVE_DIR" \
@@ -38,6 +36,7 @@ srun podman run \
     --val-check-interval 0.5 \
     --trunc-by-sample \
     --loss mse \
+    --conditions technology \
     --balance-primary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
@@ -52,9 +51,7 @@ srun podman run \
     --gen-method "orig" \
     --input-emb-style "theirs" \
     --compile
-
-SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-mkdir -p "$SAVE_DIR"
+"
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
@@ -62,7 +59,5 @@ fi
 
 cp "$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
-mv "/capstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
-mv "$TEMP_SAVE_DIR"/* "$SAVE_DIR"/
-rm -r "$TEMP_SAVE_DIR"
+mv "./${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"
