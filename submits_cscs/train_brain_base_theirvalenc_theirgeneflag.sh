@@ -3,7 +3,8 @@
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=00:15:00
 #SBATCH --partition=normal
-#SBATCH --ntasks=4
+#SBATCH --nnodes=1
+#SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
