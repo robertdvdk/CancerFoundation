@@ -1,52 +1,26 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_mine
-#SBATCH --output=/iopsstor/scratch/cscs/rvander/save/%x_%j.out
-#SBATCH --time=04:00:00
+#SBATCH --output=./%x_%j.out
+#SBATCH --time=00:15:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-task=2
 #SBATCH --cpus-per-task=64
 #SBATCH --account=a132
 
-set -e
+set -x
 
-echo "Running podman system migrate to clean up any stale state..."
-podman system migrate || echo "Migrate failed, but continuing anyway."
-echo "Cleanup finished."
+ulimit -c 0
 
-#################################
-# PyTorch environment variables #
-#################################
-export TORCH_NCCL_ASYNC_ERROR_HANDLING=1 
-export TRITON_HOME=/dev/shm/ 
-
-#################################
-# MPICH environment variables   #
-#################################
-export MPICH_GPU_SUPPORT_ENABLED=0 
-
-#################################
-# CUDA environment variables    #
-#################################
-export CUDA_CACHE_DISABLE=1 
-Avoid writing JITed binaries to the (distributed) file system, which could lead to performance issues.
-
-
-
-TEMP_SAVE_DIR="/iopsstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 TRAIN_DIR="/iopsstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
-mkdir -p "$TEMP_SAVE_DIR"
 
-podman load -i /iopsstor/scratch/cscs/rvander/images/bionemo-framework_nightly.tar
-srun podman run \
-    -e WANDB_API_KEY \
-    --workdir /users/rvander/project_dir/my_prop/CancerFoundation \
-    --volume /users/rvander/project_dir/my_prop/CancerFoundation:/users/rvander/project_dir/my_prop/CancerFoundation \
-    --volume $TEMP_SAVE_DIR:$TEMP_SAVE_DIR \
-    --volume $TRAIN_DIR:$TRAIN_DIR \
-    --gpus $CUDA_VISIBLE_DEVICES \
-    --rm \
-    nvcr.io/nvidia/clara/bionemo-framework:nightly \
+srun -ul --environment=./bionemo.toml bash -c "
+    MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \
+    MASTER_PORT=29500 \
+    RANK=\${SLURM_PROCID} \
+    LOCAL_RANK=\${SLURM_LOCALID} \
+    WORLD_SIZE=\${SLURM_NTASKS} \
     python pretrain.py \
     --gpus 2 \
     --save-dir "$TEMP_SAVE_DIR" \
@@ -77,9 +51,7 @@ srun podman run \
     --where-condition "end" \
     --gen-method "mine" \
     --compile
-
-SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-mkdir -p "$SAVE_DIR"
+"
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
     mv "./lightning_logs/version_${SLURM_JOB_ID}" "$SAVE_DIR/lightning_log"
@@ -87,7 +59,5 @@ fi
 
 cp "$TRAIN_DIR/vocab.json" "$SAVE_DIR/vocab.json"
 cp "$0" "$SAVE_DIR/run_script.sh"
-mv "/iopsstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
-mv "$TEMP_SAVE_DIR"/* "$SAVE_DIR"/
-rm -r "$TEMP_SAVE_DIR"
+mv "./${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" "$SAVE_DIR/slurm.out"
 echo "Job finished. Outputs and logs are in $SAVE_DIR"

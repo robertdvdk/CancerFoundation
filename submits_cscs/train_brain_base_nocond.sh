@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_base_nocond
-#SBATCH --output=/capstor/scratch/cscs/rvander/save/%x_%j.out
-#SBATCH --time=04:00:00
+#SBATCH --output=./%x_%j.out
+#SBATCH --time=00:15:00
 #SBATCH --partition=normal
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-task=2
@@ -10,13 +10,9 @@
 
 set -e
 
-echo "Running podman system migrate to clean up any stale state..."
-podman system migrate || echo "Migrate failed, but continuing anyway."
-echo "Cleanup finished."
+SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+TRAIN_DIR="/iopsstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
 
-TEMP_SAVE_DIR="/capstor/scratch/cscs/rvander/save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
-TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/brain/processed_data/train"
-mkdir -p "$TEMP_SAVE_DIR"
 
 podman load -i /capstor/scratch/cscs/rvander/images/bionemo-framework_nightly.tar
 srun podman run \
