@@ -74,6 +74,7 @@ def train_model(
             save_dir=save_dir,
         )
 
+    print("THE NUMBER OF GPUS IS", gpus)
     # Create trainer
     trainer = pl.Trainer(
         max_epochs=max_epochs,
