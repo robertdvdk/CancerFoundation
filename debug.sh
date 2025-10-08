@@ -21,5 +21,5 @@ python pretrain.py \
     --do-mvc \
     --log-interval 50 \
     --training-tasks "both" \
-    --gen-method "mine" \
+    --gen-method "theirs" \
     --compile

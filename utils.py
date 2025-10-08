@@ -90,7 +90,7 @@ def get_args():
     parser.add_argument(
         "--input-emb-style",
         type=str,
-        choices=["category", "continuous", "scaling"],
+        choices=["mine", "theirs"],
         default="continuous",
         help="The style of the input embedding. Default is continuous.",
     )
@@ -378,7 +378,7 @@ def get_args():
     parser.add_argument(
         "--gen-method",
         type=str,
-        choices=["theirs", "mine"],
+        choices=["theirs", "mine", "orig"],
         help="Which method to use for generative training.",
     )
 

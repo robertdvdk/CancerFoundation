@@ -1,111 +1,125 @@
+import numpy as np
 import torch
-from enum import Enum
 import sys
-import types
 import os
 import scanpy as sc
-from scib_metrics.benchmark import Benchmarker, BioConservation, BatchCorrection
+from scib_metrics.benchmark import BioConservation, BatchCorrection, Benchmarker
 import pandas as pd
+import json
+from torch.utils.data import DataLoader, SequentialSampler
+from tqdm import tqdm
+from utils import Dataset, DataCollator
 
 sys.path.insert(0, "../")
-from model.embedding import embed
+from cancerfoundation.model.model import CancerFoundation
+
 
 if __name__ == "__main__":
-    dataset = "neftel_ss2"
-    CancerGPT_model_list = ["medium", "scale_bins", "condtech_done", "epoch_15"]
+    dataset_name = "neftel_ss2"
+    CancerGPT_model_list = ["brain", "train_brain_base_7336129"]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     print(CancerGPT_model_list)
     baseline_list = []
     for model in CancerGPT_model_list:
-        if not os.path.exists(f"../model/assets/{model}/model.pth"):
-            print("Converting model checkpoints to .pth format...")
-            # Root package
-            sys.modules.setdefault(
-                "cancerfoundation", types.ModuleType("cancerfoundation")
+        for file in os.listdir(f"../save/{model}/"):
+            if file.endswith(".ckpt"):
+                chkpt_file = file
+        with open(f"../save/{model}/vocab.json", "r") as f:
+            vocab = json.load(f)
+        trained_model = (
+            CancerFoundation.load_from_checkpoint(
+                f"../save/{model}/{chkpt_file}", vocab=vocab
             )
+            .to("cuda")
+            .eval()
+        )
 
-            # Submodule: cancerfoundation.loss with LossType enum
-            class LossType(Enum):
-                ORDINALCROSSENTROPY = "ordinal_cross_entropy"
-                CORN = "corn"
-                MSE = "mse"
-
-            loss_mod = types.ModuleType("cancerfoundation.loss")
-            sys.modules["cancerfoundation.loss"] = loss_mod
-            setattr(loss_mod, "LossType", LossType)
-
-            def extract_and_modify_weights(ckpt_path, output_pth_path):
-                """
-                Loads a PyTorch Lightning checkpoint, modifies the model's state_dict keys,
-                and saves the result to a new .pth file in a single pass.
-
-                Args:
-                    ckpt_path (str): Path to the input checkpoint file (.ckpt).
-                    output_pth_path (str): Path to save the modified model weights file (.pth).
-                """
-                # 1. Load the checkpoint and extract the model weights (state_dict)
-                print(f"➡️ Loading checkpoint from: {ckpt_path}")
-                checkpoint = torch.load(ckpt_path, map_location="cpu")
-                original_state_dict = checkpoint["state_dict"]
-                print("✅ Checkpoint loaded and state_dict extracted.")
-
-                # 2. Modify the state_dict keys in-memory
-                new_state_dict = {}
-                print("⚙️  Modifying model state_dict keys...")
-                for key, value in original_state_dict.items():
-                    # First, remove the "model." prefix added by PyTorch Lightning
-                    new_key = key.replace("model.", "", 1)
-
-                    # Apply specific transformations to key names
-                    if new_key.startswith("encoder") and not new_key.startswith(
-                        "encoder.layers."
-                    ):
-                        # Rename "encoder." to "gene_encoder." for non-layer keys (e.g., cls_token)
-                        new_key = "gene_encoder" + new_key[len("encoder") :]
-                    elif "transformer_encoder" in new_key:
-                        # Standardize "transformer_encoder" to just "encoder"
-                        new_key = new_key.replace("transformer_encoder", "encoder")
-
-                    new_state_dict[new_key] = value
-                print("✅ Keys successfully modified.")
-
-                # 3. Save the new, modified state_dict to the final output file
-                print(f"💾 Saving modified model to: {output_pth_path}")
-                torch.save(new_state_dict, output_pth_path)
-                print(f"🎉 Successfully saved modified model to {output_pth_path}")
-
-            files = os.listdir(f"../model/assets/{model}/")
-            chkpt_file = None
-            for file in files:
-                if file.endswith(".ckpt"):
-                    chkpt_file = file
-            if chkpt_file:
-                extract_and_modify_weights(
-                    ckpt_path=f"../model/assets/{model}/{chkpt_file}",
-                    output_pth_path=f"../model/assets/{model}/model.pth",
-                )
-            else:
-                print(f"No checkpoint file found for model: {model}")
-
-    for model in CancerGPT_model_list:
-        # if not os.path.exists(f"./data/{dataset}/CancerGPT_{model}_{dataset}.h5ad"):
-        print("Generating embeddings...")
-        model_dir = f"../model/assets/{model}"
-        adata_path = f"./data/{dataset}/{dataset}.h5ad"
+        adata_path = f"./data/{dataset_name}/{dataset_name}.h5ad"
         adata = sc.read_h5ad(adata_path)
 
-        embed_adata = embed(
-            adata_or_file=adata,
-            model_dir=model_dir,
-            batch_key="sample",
-            batch_size=64,
-            max_length=1200,
-            scale_bins="scale_bins" in model,
-        )
-        os.makedirs(f"./data/{dataset}", exist_ok=True)
-        embed_adata.write_h5ad(f"./data/{dataset}/CancerGPT_{model}_{dataset}.h5ad")
+        adata.var["genes"] = adata.var.index
 
-    if dataset == "neftel_ss2":
+        adata.var["id_in_vocab"] = [
+            vocab[gene] if gene in vocab else -1 for gene in adata.var["genes"]
+        ]
+        adata = adata[:, adata.var["id_in_vocab"] >= 0]
+
+        if adata.n_vars > trained_model.max_seq_len:
+            sc.pp.highly_variable_genes(
+                adata,
+                n_top_genes=trained_model.max_seq_len,
+                flavor="cell_ranger",
+                batch_key="sample",
+            )
+            adata = adata[:, adata.var.highly_variable]
+        adata.var["genes"] = adata.var.index
+
+        pad_id = vocab["<pad>"]
+        genes = adata.var["genes"].tolist()
+        gene_ids = np.array([vocab.get(gene, pad_id) for gene in genes], dtype=int)
+        # gene_ids = np.array(vocab(genes), dtype=int)
+        count_matrix = adata.X
+        count_matrix = (
+            count_matrix
+            if isinstance(count_matrix, np.ndarray)
+            else count_matrix.toarray()
+        )
+
+        dataset = Dataset(count_matrix, gene_ids, vocab, pad_value=-2)
+        collator = DataCollator(
+            do_padding=True,
+            pad_token_id=vocab["<pad>"],
+            pad_value=-2,
+            do_mlm=False,
+            do_binning=True,
+            max_length=trained_model.max_seq_len + 2,
+            sampling=True,
+            keep_first_n_tokens=1,
+            scale_bins=False,
+        )
+        data_loader = DataLoader(
+            dataset,
+            batch_size=64,
+            sampler=SequentialSampler(dataset),
+            collate_fn=collator,
+            drop_last=False,
+            num_workers=min(len(os.sched_getaffinity(0)), 64),
+            pin_memory=True,
+        )
+        device = next(trained_model.parameters()).device
+        cell_embeddings = np.zeros(
+            (len(dataset), trained_model.embsize), dtype=np.float32
+        )
+        normalize = True
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=True):
+            count = 0
+            for data_dict in tqdm(data_loader, desc="Embedding cells"):
+                input_gene_ids = data_dict["gene"].to(device)
+                src_key_padding_mask = input_gene_ids.eq(pad_id)
+                embeddings = trained_model.model.embed(
+                    input_gene_ids,
+                    data_dict["expr"].to(device),
+                    src_key_padding_mask=src_key_padding_mask,
+                    conditions=torch.full(
+                        (input_gene_ids.size(0),), 2, dtype=torch.long, device=device
+                    ),
+                )[0]
+                # get the <cls> position embedding
+                embeddings = embeddings[:, 0, :]
+                embeddings = embeddings.cpu().numpy()
+                cell_embeddings[count : count + len(embeddings)] = embeddings
+                count += len(embeddings)
+
+        if normalize:
+            cell_embeddings = cell_embeddings / np.linalg.norm(
+                cell_embeddings, axis=1, keepdims=True
+            )
+        print(cell_embeddings)
+
+        adata.obsm["CancerGPT"] = cell_embeddings
+        adata.write_h5ad(f"./data/{dataset_name}/CancerGPT_{model}_{dataset_name}.h5ad")
+
+    if dataset_name == "neftel_ss2":
         label = "subtype"
     else:
         label = "celltype"
@@ -114,29 +128,28 @@ if __name__ == "__main__":
 
     for _ in range(5):
         adata = sc.read_h5ad(
-            f"./data/{dataset}/CancerGPT_{CancerGPT_model_list[0]}_{dataset}.h5ad"
+            f"./data/{dataset_name}/CancerGPT_{CancerGPT_model_list[0]}_{dataset_name}.h5ad"
         )
         for model in CancerGPT_model_list:
             adata.obsm[model] = sc.read_h5ad(
-                f"./data/{dataset}/CancerGPT_{model}_{dataset}.h5ad"
+                f"./data/{dataset_name}/CancerGPT_{model}_{dataset_name}.h5ad"
             ).obsm["CancerGPT"]
         for model in baseline_list:
             if model.startswith("scGPT"):
                 adata.obsm[model] = sc.read_h5ad(
-                    f"./data/{dataset}/{model}_{dataset}.h5ad"
+                    f"./data/{dataset_name}/{model}_{dataset_name}.h5ad"
                 ).obsm["X_scGPT"]
             elif model.startswith("scFoundation"):
                 adata.obsm[model] = sc.read_h5ad(
-                    f"./data/{dataset}/{model}_{dataset}.h5ad"
+                    f"./data/{dataset_name}/{model}_{dataset_name}.h5ad"
                 ).obsm["scFoundation_embedding"]
 
         del adata.obsm["CancerGPT"]
 
-        if dataset == "ji_skin":
+        if dataset_name == "ji_skin":
             del adata.obsm["X_cnv"]
         all_keys = list(adata.obsm.keys())
 
-        # results may vary slightly given differnet seeds
         bio_conservation = BioConservation(
             nmi_ari_cluster_labels_kmeans=False, nmi_ari_cluster_labels_leiden=True
         )
@@ -158,4 +171,4 @@ if __name__ == "__main__":
     all_results = all_results.apply(pd.to_numeric, errors="coerce")
     grouped_results = all_results.groupby(all_results.index).describe().stack()
     print(grouped_results)
-    grouped_results.to_csv(f"./data/{dataset}/batch_integration_evaluation.csv")
+    grouped_results.to_csv(f"./data/{dataset_name}/batch_integration_evaluation.csv")

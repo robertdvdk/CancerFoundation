@@ -120,20 +120,13 @@ class TransformerModule(nn.Module):
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
 
-        self.gene_encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
-
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
-        if input_emb_style == "continuous":
-            self.value_encoder = ContinuousValueEncoder(
+        if input_emb_style == "mine":
+            self.value_encoder = MyContinuousValueEncoder(
                 d_model=d_model, pcpt=not use_generative_training, dropout=dropout
             )
-        elif input_emb_style == "category":
-            assert n_input_bins > 0
-            self.value_encoder = CategoricalValueEncoder(
-                n_input_bins, d_model, padding_idx=pad_value
-            )
-        else:
-            self.value_encoder = nn.Identity()
+        elif input_emb_style == "theirs":
+            self.value_encoder = TheirContinuousValueEncoder(d_model, dropout)
 
         self.do_dat = do_dat
         self.no_invert_dat = no_invert_dat
@@ -165,7 +158,7 @@ class TransformerModule(nn.Module):
                         )
                     )
         if use_generative_training:
-            if gen_method == "theirs":
+            if gen_method == "orig":
                 encoder_layers = CFLayer(
                     d_model,
                     nhead,
@@ -177,6 +170,24 @@ class TransformerModule(nn.Module):
                 self.transformer_encoder = CFGenerator(
                     encoder_layer=encoder_layers, num_layers=nlayers
                 )
+                self.flag_encoder = nn.Embedding(2, d_model)
+                self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
+            elif gen_method == "theirs":
+                encoder_layers = CFLayer(
+                    d_model,
+                    nhead,
+                    d_hid,
+                    dropout,
+                    batch_first=True,
+                    norm_scheme=self.norm_scheme,
+                )
+                self.transformer_encoder = CFGenerator(
+                    encoder_layer=encoder_layers, num_layers=nlayers
+                )
+                self.generative_flag = nn.Parameter(torch.randn(d_model))
+                self.gene_encoder = GeneEncoder(
+                    ntoken, d_model, padding_idx=pad_token_id
+                )
             elif gen_method == "mine":
                 self.transformer_encoder = RefactoredCFGenerator(
                     d_model=d_model,
@@ -186,7 +197,10 @@ class TransformerModule(nn.Module):
                     norm_scheme=self.norm_scheme,
                     num_layers=nlayers,
                 )
-            self.generative_flag = nn.Parameter(torch.randn(d_model))
+                self.generative_flag = nn.Parameter(torch.randn(d_model))
+                self.gene_encoder = GeneEncoder(
+                    ntoken, d_model, padding_idx=pad_token_id
+                )
         else:
             encoder_layers = TransformerEncoderLayer(
                 d_model,
@@ -240,10 +254,13 @@ class TransformerModule(nn.Module):
         Returns:
             Tensor: The resulting embeddings of shape (batch, seq_len, embsize).
         """
-        gene_embs = self.gene_encoder(src)
+        if hasattr(self, "gene_encoder"):
+            gene_embs = self.gene_encoder(src)
+        elif hasattr(self, "encoder"):
+            gene_embs = self.encoder(src)
         value_embs = self.value_encoder(values)
 
-        if conditions and self.where_condition == "begin":
+        if conditions is not None and self.where_condition == "begin":
             cond_embs = self.condition_encoders["technology"](conditions)
             cond_embs = cond_embs.unsqueeze(1)  # (batch, 1, embsize)
             total_embs = torch.cat([cond_embs, gene_embs], dim=1)
@@ -258,7 +275,9 @@ class TransformerModule(nn.Module):
             total_embs = gene_embs + value_embs
 
         output = self.transformer_encoder(
-            total_embs, src_key_padding_mask=src_key_padding_mask
+            pcpt_total_embs=total_embs,
+            gen_total_embs=None,
+            pcpt_key_padding_mask=src_key_padding_mask,
         )
 
         return output
@@ -788,7 +807,37 @@ class GeneEncoder(nn.Module):
         return x
 
 
-class ContinuousValueEncoder(nn.Module):
+class TheirContinuousValueEncoder(nn.Module):
+    """
+    Encode real number values to a vector using neural nets projection.
+    """
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        self.linear1 = nn.Linear(1, d_model)
+        self.activation = nn.ReLU()
+        self.linear2 = nn.Linear(d_model, d_model)
+        self.norm = nn.LayerNorm(d_model)
+        self.max_value = max_value
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Args:
+            x: Tensor, shape [batch_size, seq_len]
+        """
+        # expand last dimension
+        x = x.unsqueeze(-1)
+        # clip x to [-inf, max_value]
+        x = torch.clamp(x, max=self.max_value)
+        x = self.activation(self.linear1(x))
+        x = self.linear2(x)
+        x = self.norm(x)
+        x = self.dropout(x)
+        return x
+
+
+class MyContinuousValueEncoder(nn.Module):
     """
     Embeds continuous gene expression values using a small feed-forward network.
     This version is rewritten to be compatible with `torch.compile`.
@@ -826,11 +875,10 @@ class ContinuousValueEncoder(nn.Module):
         # Instead of filtering with a mask, we compute embeddings for all positions.
         # This creates a static computation graph. Negative values are clamped to 0
         # so they produce a consistent "zero embedding" that can be discarded later.
-        x_processed = x.unsqueeze(-1).clamp(min=0, max=self.max_value)
+        x_processed = x.unsqueeze(-1).clamp(max=self.max_value)
         expression_embs_full = self.dropout(
             self.norm(self.linear2(self.activation(self.linear1(x_processed))))
         )
-
         # --- 2. Create boolean masks for selection ---
         # The masks must be unsqueezed to broadcast correctly with the embeddings tensor.
         is_expression = (x >= 0).unsqueeze(-1)
@@ -855,7 +903,6 @@ class ContinuousValueEncoder(nn.Module):
         output_embeddings = torch.where(
             is_expression, expression_embs_full, output_embeddings
         )
-
         return output_embeddings
 
 
