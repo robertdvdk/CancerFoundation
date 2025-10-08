@@ -46,10 +46,11 @@ srun -ul --environment=./bionemo.toml bash -c "
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
     --precision "bf16-mixed" \
     --do-mvc \
-    --log-interval 50 \
+    --log-interval 5 \
     --training-tasks "both" \
     --gen-method "orig" \
-    --input-emb-style "theirs"
+    --input-emb-style "theirs" \
+    --compile
 "
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then
