@@ -46,7 +46,7 @@ srun -ul --environment=./bionemo.toml bash -c "
     --wandb-name "${SLURM_JOB_NAME}_${SLURM_JOB_ID}" \
     --precision "bf16-mixed" \
     --do-mvc \
-    --log-interval 5 \
+    --log-interval 100 \
     --training-tasks "both" \
     --gen-method "orig" \
     --input-emb-style "theirs" \
