@@ -112,11 +112,11 @@ class TransformerModule(nn.Module):
         self.max_seq_len = max_seq_len
 
         self.n_input_bins = n_input_bins
-        if self.input_emb_style not in ["category", "continuous", "scaling"]:
-            raise ValueError(
-                f"input_emb_style should be one of category, continuous, scaling, "
-                f"got {input_emb_style}"
-            )
+        # if self.input_emb_style not in ["category", "continuous", "scaling"]:
+        #     raise ValueError(
+        #         f"input_emb_style should be one of category, continuous, scaling, "
+        #         f"got {input_emb_style}"
+        #     )
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
 
