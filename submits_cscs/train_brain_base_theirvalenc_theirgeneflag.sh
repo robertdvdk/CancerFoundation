@@ -22,7 +22,7 @@ srun -ul --environment=./bionemo.toml bash -c "
     LOCAL_RANK=\${SLURM_LOCALID} \
     WORLD_SIZE=\${SLURM_NTASKS} \
     python pretrain.py \
-    --gpus 4 \
+    --gpus 1 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 64 \
