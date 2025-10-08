@@ -379,7 +379,12 @@ class TransformerModule(nn.Module):
             self.cur_gene_token_embs = torch.cat(
                 [pcpt_token_embs, gen_token_embs], dim=1
             )
-            gen_flags = self.generative_flag
+            if hasattr(self, "generative_flag"):
+                gen_flags = self.generative_flag
+            elif hasattr(self, "flag_encoder"):
+                gen_flags = self.flag_encoder(
+                    torch.tensor(1).to(pcpt_values.device)
+                ).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
             gen_total_embs = gen_token_embs + gen_flags
         else:
             self.cur_gene_token_embs = pcpt_token_embs
