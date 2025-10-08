@@ -348,7 +348,10 @@ class TransformerModule(nn.Module):
         """
         self._check_condition_labels(conditions)
 
-        pcpt_token_embs = self.gene_encoder(pcpt_genes)
+        if hasattr(self, "gene_encoder"):
+            pcpt_token_embs = self.gene_encoder(pcpt_genes)
+        elif hasattr(self, "encoder"):
+            pcpt_token_embs = self.encoder(pcpt_genes)
         pcpt_values_embs = self.value_encoder(pcpt_values)
         pcpt_total_embs = pcpt_token_embs + pcpt_values_embs
 
@@ -375,7 +378,10 @@ class TransformerModule(nn.Module):
         assert self.input_emb_style != "scaling"
 
         if gen_genes is not None:
-            gen_token_embs = self.gene_encoder(gen_genes)
+            if hasattr(self, "gene_encoder"):
+                gen_token_embs = self.gene_encoder(gen_genes)
+            elif hasattr(self, "encoder"):
+                gen_token_embs = self.encoder(gen_genes)
             self.cur_gene_token_embs = torch.cat(
                 [pcpt_token_embs, gen_token_embs], dim=1
             )
