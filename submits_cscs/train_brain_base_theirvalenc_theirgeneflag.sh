@@ -25,7 +25,7 @@ srun -ul --environment=./bionemo.toml bash -c "
     --gpus 4 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 128 \
+    --batch-size 64 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
