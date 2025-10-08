@@ -3,9 +3,8 @@
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=00:15:00
 #SBATCH --partition=normal
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
-#SBATCH --gpus-per-task=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
@@ -23,7 +22,7 @@ srun -ul --environment=./bionemo.toml bash -c "
     LOCAL_RANK=\${SLURM_LOCALID} \
     WORLD_SIZE=\${SLURM_NTASKS} \
     python pretrain.py \
-    --gpus 4 \
+    --gpus 2 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
     --batch-size 64 \
