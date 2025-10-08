@@ -1,5 +1,4 @@
 import pytorch_lightning as pl
-import os
 from typing import Optional, Dict
 from typing import Iterator
 from operator import itemgetter
@@ -159,10 +158,11 @@ class SingleCellDataModule(pl.LightningDataModule):
         )
 
         batch_size = self.batch_size if train else self.batch_size
-        if train:
-            num_workers = min(12, min(len(os.sched_getaffinity(0)), self.batch_size))
-        else:
-            num_workers = 12
+        num_workers = 30
+        # if train:
+        #     num_workers = min(12, min(len(os.sched_getaffinity(0)), self.batch_size))
+        # else:
+        #     num_workers = 12
         print(f"Using {num_workers} workers.")
         return DataLoader(
             dataset,
