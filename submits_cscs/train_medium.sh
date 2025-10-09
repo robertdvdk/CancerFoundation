@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_brain_base_theirvalenc_theirgeneflag
+#SBATCH --job-name=train_medium
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=03:00:00
 #SBATCH --partition=normal
