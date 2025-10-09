@@ -17,7 +17,7 @@ from cancerfoundation.model.model import CancerFoundation
 if __name__ == "__main__":
     dataset_name = "neftel_ss2"
     CancerGPT_model_list = [
-        "train_medium_mine_942244",
+        "train_medium_942201",
     ]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     baseline_list = []
@@ -76,7 +76,7 @@ if __name__ == "__main__":
             max_length=trained_model.max_seq_len + 2,
             sampling=True,
             keep_first_n_tokens=1,
-            scale_bins=True,
+            scale_bins=False,
         )
         data_loader = DataLoader(
             dataset,
