@@ -1,11 +1,11 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_brain_base_theirvalenc_theirgeneflag
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=00:15:00
+#SBATCH --time=01:30:00
 #SBATCH --partition=normal
 #SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=72
 #SBATCH --account=a132
 
 set -x
@@ -36,7 +36,6 @@ srun -ul --environment=./bionemo.toml bash -c "
     --val-check-interval 1.0 \
     --trunc-by-sample \
     --loss mse \
-    --conditions technology \
     --balance-primary technology \
     --train-path "$TRAIN_DIR" \
     --zero-percentages 0.2 0.4 0.6 \
