@@ -21,5 +21,6 @@ python pretrain.py \
     --do-mvc \
     --log-interval 50 \
     --training-tasks "both" \
-    --gen-method "orig" \
-    --input-emb-style "theirs"
+    --gen-method "mine" \
+    --input-emb-style "mine" \
+    --normalise-bins
