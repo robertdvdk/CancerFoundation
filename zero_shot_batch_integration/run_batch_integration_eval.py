@@ -76,7 +76,7 @@ if __name__ == "__main__":
             max_length=trained_model.max_seq_len + 2,
             sampling=True,
             keep_first_n_tokens=1,
-            scale_bins=False,
+            scale_bins=True,
         )
         data_loader = DataLoader(
             dataset,
