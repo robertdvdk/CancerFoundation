@@ -16,7 +16,14 @@ from cancerfoundation.model.model import CancerFoundation
 
 if __name__ == "__main__":
     dataset_name = "neftel_ss2"
-    CancerGPT_model_list = ["brain", "train_brain_base_7336129"]
+    CancerGPT_model_list = [
+        "train_brain_base_7336129",
+        "myvalenc_mygeneflag",
+        "myvalenc_mygenmethod",
+        "myvalenc_theirgeneflag",
+        "theirvalenc_theirgeneflag",
+        "epoch_15",
+    ]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     print(CancerGPT_model_list)
     baseline_list = []
@@ -126,7 +133,7 @@ if __name__ == "__main__":
 
     all_results = pd.DataFrame()
 
-    for _ in range(5):
+    for _ in range(1):
         adata = sc.read_h5ad(
             f"./data/{dataset_name}/CancerGPT_{CancerGPT_model_list[0]}_{dataset_name}.h5ad"
         )
