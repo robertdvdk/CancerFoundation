@@ -17,15 +17,9 @@ from cancerfoundation.model.model import CancerFoundation
 if __name__ == "__main__":
     dataset_name = "neftel_ss2"
     CancerGPT_model_list = [
-        "train_brain_base_7336129",
-        "myvalenc_mygeneflag",
-        "myvalenc_mygenmethod",
-        "myvalenc_theirgeneflag",
-        "theirvalenc_theirgeneflag",
-        "epoch_15",
+        "train_brain_base_theirvalenc_theirgeneflag_941885",
     ]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
-    print(CancerGPT_model_list)
     baseline_list = []
     for model in CancerGPT_model_list:
         for file in os.listdir(f"../save/{model}/"):
@@ -176,6 +170,5 @@ if __name__ == "__main__":
         curr_result = curr_result[curr_result.index != "Metric Type"]
         all_results = pd.concat([all_results, curr_result])
     all_results = all_results.apply(pd.to_numeric, errors="coerce")
-    grouped_results = all_results.groupby(all_results.index).describe().stack()
-    print(grouped_results)
-    grouped_results.to_csv(f"./data/{dataset_name}/batch_integration_evaluation.csv")
+    print(all_results)
+    all_results.to_csv(f"./data/{dataset_name}/batch_integration_evaluation.csv")

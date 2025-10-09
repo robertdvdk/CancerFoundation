@@ -2,7 +2,7 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
 {
 	"name": "scgpt",
-	"image": "nvcr.io/nvidia/clara/bionemo-framework:nightly",
+	"image": "nvcr.io/nvidia/clara/bionemo-framework:2.7",
 	"runArgs": [
     "--gpus",
     "all",

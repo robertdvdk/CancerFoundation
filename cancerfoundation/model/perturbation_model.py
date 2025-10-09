@@ -18,6 +18,7 @@ class PerturbationTransformer(TransformerModule):
 
         # Add the new, perturbation-specific layer
         self.pert_encoder = nn.Embedding(3, self.d_model, padding_idx=pert_pad_id)
+        print("QQQ")
 
     def _encode_perturbation(
         self,

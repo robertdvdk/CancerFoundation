@@ -4,6 +4,7 @@ import os
 from typing import Any, List, Optional, Union
 import transformers
 import torch
+from cancerfoundation.model.perturbation_model import PerturbationTransformer
 from cancerfoundation.utils import load_pretrained
 from cancerfoundation.model.module import TransformerModule
 from cancerfoundation.loss import get_loss
@@ -63,6 +64,7 @@ class CancerFoundation(pl.LightningModule):
         normalise_bins: bool = False,
         where_condition: str = "end",
         gen_method: str = "orig",
+        perturbation: bool = False,
     ):
         """Initializes the CancerFoundation LightningModule.
 
@@ -128,6 +130,7 @@ class CancerFoundation(pl.LightningModule):
         self.norm_first = norm_first
         self.batchnorm = batchnorm
         self.cell_emb_style = cell_emb_style
+        self.perturbation = perturbation
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -183,36 +186,70 @@ class CancerFoundation(pl.LightningModule):
             scale_zero_expression=self.scale_zero_expression,
         )
 
-        self.model = TransformerModule(
-            ntoken=len(self.vocab.keys()),
-            d_model=self.embsize,
-            out_dim=self.criterion.get_in_dim(),
-            mvc_decoder_style=mvc_decoder_style,
-            nhead=self.nheads,
-            d_hid=self.d_hid,
-            nlayers=self.nlayers,
-            dropout=self.dropout,
-            pad_token_id=self.pad_token_id,
-            criterion=self.criterion,
-            pad_value=self.pad_value,
-            do_mvc=self.do_mvc,
-            conditions=self.conditions_nums,
-            input_emb_style=self.input_emb_style,
-            n_input_bins=self.n_input_bins,
-            use_generative_training=self.USE_GENERATIVE_TRAINING,
-            do_dat=self.do_dat,
-            no_invert_dat=self.no_invert_dat,
-            explicit_zero_prob=self.explicit_zero_prob,
-            activation=self.activation,
-            norm_first=self.norm_first,
-            batchnorm=self.batchnorm,
-            cell_emb_style=self.cell_emb_style,
-            dat_scale=self.dat_scale,
-            normalise_bins=self.normalise_bins,
-            where_condition=self.where_condition,
-            max_seq_len=self.max_seq_len,
-            gen_method=self.gen_method,
-        )
+        if self.perturbation:
+            self.model = PerturbationTransformer(
+                ntoken=len(self.vocab.keys()),
+                d_model=self.embsize,
+                out_dim=self.criterion.get_in_dim(),
+                mvc_decoder_style=mvc_decoder_style,
+                nhead=self.nheads,
+                d_hid=self.d_hid,
+                nlayers=self.nlayers,
+                dropout=self.dropout,
+                pad_token_id=self.pad_token_id,
+                criterion=self.criterion,
+                pad_value=self.pad_value,
+                do_mvc=self.do_mvc,
+                conditions=self.conditions_nums,
+                input_emb_style=self.input_emb_style,
+                n_input_bins=self.n_input_bins,
+                use_generative_training=self.USE_GENERATIVE_TRAINING,
+                do_dat=self.do_dat,
+                no_invert_dat=self.no_invert_dat,
+                explicit_zero_prob=self.explicit_zero_prob,
+                activation=self.activation,
+                norm_first=self.norm_first,
+                batchnorm=self.batchnorm,
+                cell_emb_style=self.cell_emb_style,
+                dat_scale=self.dat_scale,
+                normalise_bins=self.normalise_bins,
+                where_condition=self.where_condition,
+                max_seq_len=self.max_seq_len,
+                gen_method=self.gen_method,
+                pert_pad_id=2,
+            )
+
+        else:
+            self.model = TransformerModule(
+                ntoken=len(self.vocab.keys()),
+                d_model=self.embsize,
+                out_dim=self.criterion.get_in_dim(),
+                mvc_decoder_style=mvc_decoder_style,
+                nhead=self.nheads,
+                d_hid=self.d_hid,
+                nlayers=self.nlayers,
+                dropout=self.dropout,
+                pad_token_id=self.pad_token_id,
+                criterion=self.criterion,
+                pad_value=self.pad_value,
+                do_mvc=self.do_mvc,
+                conditions=self.conditions_nums,
+                input_emb_style=self.input_emb_style,
+                n_input_bins=self.n_input_bins,
+                use_generative_training=self.USE_GENERATIVE_TRAINING,
+                do_dat=self.do_dat,
+                no_invert_dat=self.no_invert_dat,
+                explicit_zero_prob=self.explicit_zero_prob,
+                activation=self.activation,
+                norm_first=self.norm_first,
+                batchnorm=self.batchnorm,
+                cell_emb_style=self.cell_emb_style,
+                dat_scale=self.dat_scale,
+                normalise_bins=self.normalise_bins,
+                where_condition=self.where_condition,
+                max_seq_len=self.max_seq_len,
+                gen_method=self.gen_method,
+            )
         if self.compile_model:
             self.model = torch.compile(self.model)
 
