@@ -121,7 +121,6 @@ class TransformerModule(nn.Module):
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
-        print(f"THIS IS{input_emb_style}.")
         if input_emb_style == "mine":
             self.value_encoder = MyContinuousValueEncoder(
                 d_model=d_model, pcpt=not use_generative_training, dropout=dropout
