@@ -18,6 +18,10 @@ if __name__ == "__main__":
     dataset_name = "neftel_ss2"
     CancerGPT_model_list = [
         "train_medium_942201",
+        "train_medium_compile_bf16_atheusdataset_7367148",
+        "train_brain_compile_bf16_7367147",
+        "QQQ",
+        "epoch_15",
     ]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     baseline_list = []
