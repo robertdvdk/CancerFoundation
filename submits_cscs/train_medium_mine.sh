@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_medium_mine
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=03:00:00
+#SBATCH --time=06:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
