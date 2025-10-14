@@ -23,4 +23,7 @@ python pretrain.py \
     --training-tasks "both" \
     --gen-method "mine" \
     --input-emb-style "mine" \
-    --normalise-bins
+    --normalise-bins \
+    --conditions technology \
+    --where-condition end \
+    --their-init-weights

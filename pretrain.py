@@ -169,6 +169,7 @@ def main():
             normalise_bins=args.normalise_bins,
             where_condition=args.where_condition,
             gen_method=args.gen_method,
+            their_init_weights=args.their_init_weights,
         )
 
     if args.pretrained:

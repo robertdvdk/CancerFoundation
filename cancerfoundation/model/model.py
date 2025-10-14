@@ -54,16 +54,17 @@ class CancerFoundation(pl.LightningModule):
         balance_primary: Optional[str],
         balance_secondary: Optional[str],
         zero_percentages: Optional[List[float]],
-        do_mvc: bool = True,
-        no_invert_dat: bool = True,
-        activation: str = "relu",
-        norm_first: bool = False,
-        cell_emb_style: str = "cls",
-        batchnorm: bool = False,
-        dat_scale: float = 1.0,
-        normalise_bins: bool = False,
-        where_condition: str = "end",
-        gen_method: str = "orig",
+        do_mvc: bool,
+        no_invert_dat: bool,
+        activation: str,
+        norm_first: bool,
+        cell_emb_style: str,
+        batchnorm: bool,
+        dat_scale: float,
+        normalise_bins: bool,
+        where_condition: str,
+        gen_method: str,
+        their_init_weights: bool,
         perturbation: bool = False,
     ):
         """Initializes the CancerFoundation LightningModule.
@@ -131,6 +132,7 @@ class CancerFoundation(pl.LightningModule):
         self.batchnorm = batchnorm
         self.cell_emb_style = cell_emb_style
         self.perturbation = perturbation
+        self.their_init_weights = their_init_weights
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -249,6 +251,7 @@ class CancerFoundation(pl.LightningModule):
                 where_condition=self.where_condition,
                 max_seq_len=self.max_seq_len,
                 gen_method=self.gen_method,
+                their_init_weights=self.their_init_weights,
             )
         if self.compile_model:
             self.model = torch.compile(self.model)

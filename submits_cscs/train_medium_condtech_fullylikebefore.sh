@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_medium_fullylikebefore
+#SBATCH --job-name=train_medium_condtech_fullylikebefore
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=12:00:00
 #SBATCH --partition=normal
@@ -51,7 +51,9 @@ srun -ul --environment=./bionemo.toml bash -c "
     --gen-method "orig" \
     --input-emb-style "theirs" \
     --compile \
-    --conditions technology
+    --conditions technology \
+    --where-condition end \
+    --their-init-weights
 "
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then

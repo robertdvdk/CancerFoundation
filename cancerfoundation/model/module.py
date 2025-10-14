@@ -68,6 +68,7 @@ class TransformerModule(nn.Module):
         where_condition: str,
         max_seq_len: int,
         gen_method: str,
+        their_init_weights: bool,
     ):
         """Initializes the TransformerModule.
 
@@ -232,7 +233,8 @@ class TransformerModule(nn.Module):
                 normalise_bins=normalise_bins,
             )
 
-        # self.init_weights()
+        if their_init_weights:
+            self.init_weights()
 
     def init_weights(self) -> None:
         """Initializes the weights of the gene embedding layer."""
@@ -748,16 +750,12 @@ class TransformerModule(nn.Module):
                 ],
                 dim=1,
             )
+        transformer_output = self.encode(src, values, src_key_padding_mask, conditions)
+
         if self.where_condition == "begin":
-            transformer_output = self.encode(
-                src, values, src_key_padding_mask, conditions
-            )
             decoder_input = transformer_output
 
         elif self.where_condition == "end":
-            transformer_output = self.encode(
-                src, values, src_key_padding_mask, conditions
-            )
             if self.conditions:
                 decoder_input = torch.cat(
                     [

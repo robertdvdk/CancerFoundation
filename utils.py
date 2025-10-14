@@ -382,6 +382,12 @@ def get_args():
         help="Which method to use for generative training.",
     )
 
+    parser.add_argument(
+        "--their-init-weights",
+        action="store_true",
+        help="Whether to use the weight initialisation from before.",
+    )
+
     return parser.parse_args()
 
 
