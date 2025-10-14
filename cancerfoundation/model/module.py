@@ -239,7 +239,7 @@ class TransformerModule(nn.Module):
     def init_weights(self) -> None:
         """Initializes the weights of the gene embedding layer."""
         initrange = 0.1
-        self.gene_encoder.embedding.weight.data.uniform_(-initrange, initrange)
+        self.encoder.embedding.weight.data.uniform_(-initrange, initrange)
 
     def embed(
         self,
