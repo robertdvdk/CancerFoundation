@@ -10,7 +10,7 @@ workdir = "/users/rvander/my_prop/CancerFoundation"
 
 [annotations]
 com.hooks.aws_ofi_nccl.enabled = "true"
-com.hooks.awi_ofi_nccl.variant = "cuda12"
+com.hooks.aws_ofi_nccl.variant = "cuda12"
 
 [env]
 NCCL_DEBUG = "INFO"
