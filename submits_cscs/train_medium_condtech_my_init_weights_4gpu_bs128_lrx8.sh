@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=train_medium_condtech_my_init_weights_4gpu_bs256_lrx16
+#SBATCH --job-name=train_medium_condtech_my_init_weights_4gpu_bs128_lrx8
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=04:00:00
 #SBATCH --partition=normal
@@ -25,14 +25,14 @@ srun -ul --environment=./bionemo.toml bash -c "
     --gpus 4 \
     --save-dir "$SAVE_DIR" \
     --max-seq-len 1200 \
-    --batch-size 256 \
+    --batch-size 128 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 256 \
     --d-hi 512 \
     --epochs 15 \
-    --lr 0.0016 \
-    --warmup-ratio-or-step 625 \
+    --lr 0.0008 \
+    --warmup-ratio-or-step 1250 \
     --val-check-interval 1.0 \
     --trunc-by-sample \
     --loss mse \
