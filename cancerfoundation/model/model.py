@@ -219,6 +219,7 @@ class CancerFoundation(pl.LightningModule):
                 max_seq_len=self.max_seq_len,
                 gen_method=self.gen_method,
                 pert_pad_id=2,
+                their_init_weights=self.their_init_weights,
             )
 
         else:

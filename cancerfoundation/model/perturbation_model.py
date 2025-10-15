@@ -18,7 +18,11 @@ class PerturbationTransformer(TransformerModule):
 
         # Add the new, perturbation-specific layer
         self.pert_encoder = nn.Embedding(3, self.d_model, padding_idx=pert_pad_id)
-        print("QQQ")
+
+        if self.conditions is not None:
+            print(
+                "Support for conditions is not yet implemented, but this model has been pretrained with conditions. Performance may suffer!"
+            )
 
     def _encode_perturbation(
         self,
@@ -35,8 +39,10 @@ class PerturbationTransformer(TransformerModule):
         total_embs = src_embs + values_embs + pert_embs
 
         # Reuse the transformer_encoder initialized by the parent class
-        output = self.transformer_encoder(
-            total_embs, src_key_padding_mask=src_key_padding_mask
+        output, _ = self.transformer_encoder(
+            pcpt_total_embs=total_embs,
+            gen_total_embs=None,
+            pcpt_key_padding_mask=src_key_padding_mask,
         )
         return output
 
@@ -45,6 +51,7 @@ class PerturbationTransformer(TransformerModule):
         tensors: Dict[str, torch.Tensor],
         use_cell_embedding: bool = False,  # Keep all args for compatibility
     ) -> Dict[str, torch.Tensor]:
+        condition = None
         # 1. Unpack the dictionary at the beginning of the method
         src = tensors["gene"]
         values = tensors["masked_expr"]
@@ -56,8 +63,14 @@ class PerturbationTransformer(TransformerModule):
             src, values, src_key_padding_mask, pert_flags
         )
 
+        if condition is None and self.conditions is not None:
+            conditions = torch.zeros_like(transformer_output)
+            decoder_input = torch.cat([transformer_output, conditions], dim=-1)
+        else:
+            decoder_input = transformer_output
+
         # 3. Decode the output to get predictions
-        decoder_output = self.decoder(transformer_output)
+        decoder_output = self.decoder(decoder_input)
 
         # 4. Return the result
         # The return type Mapping[str, Tensor] is also compatible.

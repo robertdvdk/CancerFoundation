@@ -17,27 +17,48 @@ from cancerfoundation.model.model import CancerFoundation
 if __name__ == "__main__":
     dataset_name = "neftel_ss2"
     CancerGPT_model_list = [
-        "train_medium_942201",
-        "train_medium_compile_bf16_atheusdataset_7367148",
-        "train_brain_compile_bf16_7367147",
-        "QQQ",
-        "epoch_15",
+        "medium_mine",
+        "my_init_weights",
+        "fullylikebefore",
+        # "epoch_15",
+        # "QQQ",
+        # "train_medium_942201",
+        # "train_medium_compile_bf16_atheusdataset_7367148"
     ]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     baseline_list = []
     for model in CancerGPT_model_list:
-        for file in os.listdir(f"../save/{model}/"):
-            if file.endswith(".ckpt"):
-                chkpt_file = file
-        with open(f"../save/{model}/vocab.json", "r") as f:
-            vocab = json.load(f)
-        trained_model = (
-            CancerFoundation.load_from_checkpoint(
-                f"../save/{model}/{chkpt_file}", vocab=vocab
+        print(model)
+        if model == "medium_mine":
+            for file in os.listdir(f"../save/{model}/"):
+                if file.endswith(".ckpt"):
+                    chkpt_file = file
+            with open(f"../save/{model}/vocab.json", "r") as f:
+                vocab = json.load(f)
+            trained_model = (
+                CancerFoundation.load_from_checkpoint(
+                    f"../save/{model}/{chkpt_file}",
+                    vocab=vocab,
+                    their_init_weights=False,
+                )
+                .to("cuda")
+                .eval()
             )
-            .to("cuda")
-            .eval()
-        )
+        else:
+            for file in os.listdir(f"../save/{model}/"):
+                if file.endswith(".ckpt"):
+                    chkpt_file = file
+            with open(f"../save/{model}/vocab.json", "r") as f:
+                vocab = json.load(f)
+            trained_model = (
+                CancerFoundation.load_from_checkpoint(
+                    f"../save/{model}/{chkpt_file}",
+                    vocab=vocab,
+                    their_init_weights=False,
+                )
+                .to("cuda")
+                .eval()
+            )
 
         adata_path = f"./data/{dataset_name}/{dataset_name}.h5ad"
         adata = sc.read_h5ad(adata_path)
