@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #SBATCH --job-name=train_medium_condtech_my_init_weights_4gpu_bs64_lrx4
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=12:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=normal
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=72
 #SBATCH --account=a132
