@@ -1,4 +1,4 @@
-image = "/capstor/scratch/cscs/rvander/ce-images/bionemo.sqsh"
+image = "/iopsstor/scratch/cscs/rvander/ce-images/bionemo.sqsh"
 
 mounts = [
 	"/capstor",
@@ -9,11 +9,11 @@ mounts = [
 workdir = "/users/rvander/my_prop/CancerFoundation"
 
 [annotations]
-com.hooks.aws_ofi_nccl.enbaled = "true"
+com.hooks.aws_ofi_nccl.enabled = "true"
 com.hooks.awi_ofi_nccl.variant = "cuda12"
 
 [env]
 NCCL_DEBUG = "INFO"
 CUDA_CACHE_DISABLE = "1"
 TORCH_NCCL_ASYNC_ERROR_HANDLING = "1"
-MPICH_GPU_SUPPORT_ENALBED = "0"
+MPICH_GPU_SUPPORT_ENABLED = "0"

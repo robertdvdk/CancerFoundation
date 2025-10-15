@@ -17,13 +17,10 @@ from cancerfoundation.model.model import CancerFoundation
 if __name__ == "__main__":
     dataset_name = "neftel_ss2"
     CancerGPT_model_list = [
-        "medium_mine",
-        "my_init_weights",
-        "fullylikebefore",
-        # "epoch_15",
-        # "QQQ",
-        # "train_medium_942201",
-        # "train_medium_compile_bf16_atheusdataset_7367148"
+        "my_init_4gpu",
+        "my_init_4gpu_bs64",
+        "my_init_4gpu_bs64_lrx4",
+        "my_init_4gpu_lrx2",
     ]
     # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     baseline_list = []
