@@ -15,20 +15,8 @@ from cancerfoundation.model.model import CancerFoundation
 
 
 if __name__ == "__main__":
-    dataset_name = "kim_lung"
-    CancerGPT_model_list = [
-        "my_init_4gpu",
-        "my_init_4gpu_2",
-        "my_init_4gpu_bs64",
-        "my_init_4gpu_bs64_2",
-        "my_init_4gpu_bs64_lrx4",
-        "my_init_4gpu_bs64_lrx4_2",
-        "my_init_4gpu_lrx2",
-        "my_init_4gpu_lrx2_2",
-        "my_init_4gpu_warmupratio",
-        "my_init_4gpu_bs128_lrx8",
-        "my_init_weights",
-    ]
+    dataset_name = "neftel_ss2"
+    CancerGPT_model_list = ["train_medium_condtech_my_init_weights_4gpu_lrx2_955577"]
     baseline_list = []
     for model in CancerGPT_model_list:
         print(model)
