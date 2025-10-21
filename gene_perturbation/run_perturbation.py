@@ -724,7 +724,12 @@ def main():
 
     train_loader = pert_data.dataloader["train_loader"]
     q = next(iter(train_loader))
-    print(q)
+    print(q.x[:, 0].min(), q.x[:, 0].max(), q.x[:, 0].mean(), q.x[:, 0])
+    if q.x.shape[1] > 1:
+        print(q.x[:, 1].min(), q.x[:, 1].max(), q.x[:, 1].mean(), q.x[:, 1])
+    else:
+        print(q.pert.min(), q.pert.max(), q.pert.mean(), q.pert)
+    print(q.y.min(), q.y.max(), q.y.mean(), q.y)
 
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
