@@ -728,7 +728,7 @@ def main():
     if q.x.shape[1] > 1:
         print(q.x[:, 1].min(), q.x[:, 1].max(), q.x[:, 1].mean(), q.x[:, 1])
     else:
-        print(q.pert.min(), q.pert.max(), q.pert.mean(), q.pert)
+        print(q.pert)
     print(q.y.min(), q.y.max(), q.y.mean(), q.y)
 
     for epoch in range(1, args.epochs + 1):
