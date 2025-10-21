@@ -722,6 +722,10 @@ def main():
     best_model = None
     patience = 0
 
+    train_loader = pert_data.dataloader["train_loader"]
+    q = next(iter(train_loader))
+    print(q)
+
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
         train_loader = pert_data.dataloader["train_loader"]
