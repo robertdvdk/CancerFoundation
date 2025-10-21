@@ -16,6 +16,11 @@ class RefactoredCFGenerator(nn.Module):
     the concatenation of perceptual/generative sequences, creating the specific
     attention mask, and splitting the outputs. This logic is wrapped around
     a standard `torch.nn.TransformerEncoder`.
+
+    Performance optimizations:
+    - Uses standard PyTorch TransformerEncoder for optimized kernels
+    - Caches attention masks to avoid recreation on every forward pass
+    - Single concatenation/split operation vs per-layer operations
     """
 
     def __init__(
@@ -75,6 +80,41 @@ class RefactoredCFGenerator(nn.Module):
             norm=norm,
         )
 
+        # Cache for attention masks to avoid recreation on every forward pass
+        self._mask_cache = {}
+
+    def _create_attention_mask(
+        self, pcpt_seq_len: int, gen_seq_len: int, device: torch.device
+    ) -> Tensor:
+        """
+        Create and cache the attention mask for the perceptual-generative architecture.
+
+        The mask prevents all tokens from attending to generative tokens (except themselves).
+        This enables parallel generation of all generative tokens conditioned on perceptual tokens.
+
+        Args:
+            pcpt_seq_len (int): Length of the perceptual sequence.
+            gen_seq_len (int): Length of the generative sequence.
+            device (torch.device): Device to place the mask on.
+
+        Returns:
+            Tensor: Boolean attention mask of shape (total_seq_len, total_seq_len).
+        """
+        total_seq_len = pcpt_seq_len + gen_seq_len
+        cache_key = (pcpt_seq_len, gen_seq_len)
+
+        # Check if mask is already cached
+        if cache_key not in self._mask_cache:
+            # Create the custom attention mask
+            # Shape: (total_seq_len, total_seq_len)
+            src_mask = torch.zeros(total_seq_len, total_seq_len, dtype=torch.bool)
+            src_mask[:, pcpt_seq_len:] = True  # Block attention to generative tokens
+            src_mask.diagonal().fill_(False)  # Allow tokens to attend to themselves
+            self._mask_cache[cache_key] = src_mask
+
+        # Return cached mask on the correct device
+        return self._mask_cache[cache_key].to(device)
+
     def forward(
         self,
         pcpt_total_embs: Tensor,
@@ -104,7 +144,6 @@ class RefactoredCFGenerator(nn.Module):
         # --- Pre-processing Step ---
         pcpt_seq_len = pcpt_total_embs.shape[1]
         gen_seq_len = gen_total_embs.shape[1]
-        total_seq_len = pcpt_seq_len + gen_seq_len
 
         # 1. Concatenate inputs
         src = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
@@ -124,14 +163,8 @@ class RefactoredCFGenerator(nn.Module):
                 (pcpt_key_padding_mask, gen_key_padding_mask), dim=1
             )
 
-        # 3. Create the custom attention mask (src_mask)
-        # This mask prevents all tokens from attending to the generative tokens.
-        # Shape: (total_seq_len, total_seq_len)
-        src_mask = torch.zeros(
-            total_seq_len, total_seq_len, dtype=torch.bool, device=src.device
-        )
-        src_mask[:, pcpt_seq_len:] = True  # Block attention to generative tokens
-        src_mask.diagonal().fill_(False)  # Allow tokens to attend to themselves
+        # 3. Get the cached attention mask
+        src_mask = self._create_attention_mask(pcpt_seq_len, gen_seq_len, src.device)
 
         # --- Call the standard Transformer Encoder ---
         output = self.transformer_encoder(

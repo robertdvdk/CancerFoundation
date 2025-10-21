@@ -7,27 +7,6 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from .layers import CFGenerator, CFLayer, RefactoredCFGenerator
 
 from .grad_reverse import grad_reverse
-from torch.nn.attention import SDPBackend, sdpa_kernel
-
-torch.backends.cuda.enable_flash_sdp(True)
-torch.backends.cuda.enable_mem_efficient_sdp(True)
-torch.backends.cuda.enable_math_sdp(False)  # forbid the big MATH fallback
-
-
-def with_sdp_kernel(func):
-    """Decorator to run a function within the Scaled Dot-Product Attention kernel context."""
-
-    def wrapped_func(*args, **kwargs):
-        with sdpa_kernel(
-            [
-                SDPBackend.FLASH_ATTENTION,
-                SDPBackend.EFFICIENT_ATTENTION,
-                SDPBackend.MATH,
-            ]
-        ):
-            return func(*args, **kwargs)
-
-    return wrapped_func
 
 
 class TransformerModule(nn.Module):
@@ -111,6 +90,7 @@ class TransformerModule(nn.Module):
         self.use_generative_training = use_generative_training
         self.where_condition = where_condition
         self.max_seq_len = max_seq_len
+        self.gen_method = gen_method
 
         self.n_input_bins = n_input_bins
         # if self.input_emb_style not in ["category", "continuous", "scaling"]:
@@ -216,6 +196,7 @@ class TransformerModule(nn.Module):
                 activation=activation,
             )
             self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+            self.gene_encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
 
         self.decoder = ExprDecoder(
             d_in=expr_decoder_d_in,

@@ -15,14 +15,20 @@ from cancerfoundation.model.model import CancerFoundation
 
 
 if __name__ == "__main__":
-    dataset_name = "neftel_ss2"
+    dataset_name = "kim_lung"
     CancerGPT_model_list = [
         "my_init_4gpu",
+        "my_init_4gpu_2",
         "my_init_4gpu_bs64",
+        "my_init_4gpu_bs64_2",
         "my_init_4gpu_bs64_lrx4",
+        "my_init_4gpu_bs64_lrx4_2",
         "my_init_4gpu_lrx2",
+        "my_init_4gpu_lrx2_2",
+        "my_init_4gpu_warmupratio",
+        "my_init_4gpu_bs128_lrx8",
+        "my_init_weights",
     ]
-    # CancerGPT_model_list = [f"epoch_{i}" for i in range(1, 16)]
     baseline_list = []
     for model in CancerGPT_model_list:
         print(model)
@@ -80,7 +86,6 @@ if __name__ == "__main__":
         pad_id = vocab["<pad>"]
         genes = adata.var["genes"].tolist()
         gene_ids = np.array([vocab.get(gene, pad_id) for gene in genes], dtype=int)
-        # gene_ids = np.array(vocab(genes), dtype=int)
         count_matrix = adata.X
         count_matrix = (
             count_matrix
@@ -124,7 +129,7 @@ if __name__ == "__main__":
                     data_dict["expr"].to(device),
                     src_key_padding_mask=src_key_padding_mask,
                     conditions=torch.full(
-                        (input_gene_ids.size(0),), 2, dtype=torch.long, device=device
+                        (input_gene_ids.size(0),), 12, dtype=torch.long, device=device
                     ),
                 )[0]
                 # get the <cls> position embedding

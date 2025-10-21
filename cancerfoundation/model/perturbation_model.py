@@ -31,19 +31,22 @@ class PerturbationTransformer(TransformerModule):
         src_key_padding_mask: Tensor,
         pert_flags: Tensor,
     ) -> Tensor:
-        src_embs = self.gene_encoder(src)
+        if self.gen_method == "orig":
+            src_embs = self.encoder(src)
+        else:
+            src_embs = self.gene_encoder(src)
         self.cur_gene_token_embs = src_embs  # For MVC if you use it
         values_embs = self.value_encoder(values)
         pert_embs = self.pert_encoder(pert_flags)
 
         total_embs = src_embs + values_embs + pert_embs
 
-        # Reuse the transformer_encoder initialized by the parent class
-        output, _ = self.transformer_encoder(
+        output = self.transformer_encoder(
             pcpt_total_embs=total_embs,
             gen_total_embs=None,
             pcpt_key_padding_mask=src_key_padding_mask,
         )
+
         return output
 
     def forward(
@@ -56,10 +59,10 @@ class PerturbationTransformer(TransformerModule):
         src = tensors["gene"]
         values = tensors["masked_expr"]
         pert_flags = tensors["pert_flags"]
-        src_key_padding_mask = src.eq(self.pad_token_id)
+        src_key_padding_mask = tensors["src_key_padding_mask"]
 
         # 2. Call your perturbation-specific encoding method
-        transformer_output = self._encode_perturbation(
+        transformer_output, _ = self._encode_perturbation(
             src, values, src_key_padding_mask, pert_flags
         )
 
@@ -73,8 +76,7 @@ class PerturbationTransformer(TransformerModule):
         decoder_output = self.decoder(decoder_input)
 
         # 4. Return the result
-        # The return type Mapping[str, Tensor] is also compatible.
-        return {"mlm_output": decoder_output["pred"]}
+        return decoder_output
 
     # The inference method stays the same
     def pred_perturb(
