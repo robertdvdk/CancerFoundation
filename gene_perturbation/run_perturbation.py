@@ -357,6 +357,7 @@ def train_one_epoch(
             total_loss = 0
             total_mse = 0
             start_time = time.time()
+            break
 
 
 def eval_perturb(loader, model, device, n_genes, gene_ids, include_zero_gene):
@@ -755,17 +756,6 @@ def main():
     best_val_corr = 0
     best_model = None
     patience = 0
-
-    train_loader = pert_data.dataloader["train_loader"]
-    q = next(iter(train_loader))
-    print(q)
-    print(q.x[:, 0].min(), q.x[:, 0].max(), q.x[:, 0].mean(), q.x[:, 0])
-    if q.x.shape[1] > 1:
-        print(q.x[:, 1].min(), q.x[:, 1].max(), q.x[:, 1].mean(), q.x[:, 1])
-    else:
-        print(q.pert)
-        print(q.pert_idx)
-    print(q.y.min(), q.y.max(), q.y.mean(), q.y)
 
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
