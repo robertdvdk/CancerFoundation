@@ -357,7 +357,6 @@ def train_one_epoch(
             total_loss = 0
             total_mse = 0
             start_time = time.time()
-            break
 
 
 def eval_perturb(loader, model, device, n_genes, gene_ids, include_zero_gene):
