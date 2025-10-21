@@ -266,9 +266,21 @@ def train_one_epoch(
     for batch, batch_data in enumerate(train_loader):
         batch_size = len(batch_data.y)
         batch_data.to(device)
-        x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 2)
+        x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 1) in new version
         ori_gene_values = x[:, 0].view(batch_size, n_genes)
-        pert_flags = x[:, 1].long().view(batch_size, n_genes)
+
+        # Reconstruct pert_flags from pert_idx (new version)
+        pert_flags = torch.zeros(batch_size, n_genes, dtype=torch.long, device=device)
+        for i in range(batch_size):
+            pert_idx_list = (
+                batch_data.pert_idx[i] if hasattr(batch_data, "pert_idx") else []
+            )
+            if isinstance(pert_idx_list, int):
+                pert_idx_list = [pert_idx_list]
+            for idx in pert_idx_list:
+                if idx >= 0:  # -1 means no perturbation
+                    pert_flags[i, idx] = 1
+
         target_gene_values = batch_data.y  # (batch_size, n_genes)
 
         if include_zero_gene in ["all", "batch-wise"]:
@@ -364,9 +376,18 @@ def eval_perturb(loader, model, device, n_genes, gene_ids, include_zero_gene):
         pert_cat.extend(batch.pert)
         batch_size = len(batch.y)
         batch.to(device)
-        x: torch.Tensor = batch.x  # (batch_size * n_genes, 2)
+        x: torch.Tensor = batch.x  # (batch_size * n_genes, 1) in new version
         ori_gene_values = x[:, 0].view(batch_size, n_genes)
-        pert_flags = x[:, 1].long().view(batch_size, n_genes)
+
+        # Reconstruct pert_flags from pert_idx (new version)
+        pert_flags = torch.zeros(batch_size, n_genes, dtype=torch.long, device=device)
+        for i in range(batch_size):
+            pert_idx_list = batch.pert_idx[i] if hasattr(batch, "pert_idx") else []
+            if isinstance(pert_idx_list, int):
+                pert_idx_list = [pert_idx_list]
+            for idx in pert_idx_list:
+                if idx >= 0:  # -1 means no perturbation
+                    pert_flags[i, idx] = 1
 
         if include_zero_gene in ["all", "batch-wise"]:
             if include_zero_gene == "all":
@@ -469,9 +490,22 @@ def plot_perturbation(
         for batch_data in loader:
             batch_size = len(batch_data.y)
             batch_data.to(device)
-            x: torch.Tensor = batch_data.x
+            x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 1) in new version
             ori_gene_values = x[:, 0].view(batch_size, n_genes)
-            pert_flags = x[:, 1].long().view(batch_size, n_genes)
+
+            # Reconstruct pert_flags from pert_idx (new version)
+            pert_flags = torch.zeros(
+                batch_size, n_genes, dtype=torch.long, device=device
+            )
+            for i in range(batch_size):
+                pert_idx_list = (
+                    batch_data.pert_idx[i] if hasattr(batch_data, "pert_idx") else []
+                )
+                if isinstance(pert_idx_list, int):
+                    pert_idx_list = [pert_idx_list]
+                for idx in pert_idx_list:
+                    if idx >= 0:  # -1 means no perturbation
+                        pert_flags[i, idx] = 1
 
             if include_zero_gene == "all":
                 input_gene_ids = torch.arange(n_genes, device=device, dtype=torch.long)
@@ -724,11 +758,13 @@ def main():
 
     train_loader = pert_data.dataloader["train_loader"]
     q = next(iter(train_loader))
+    print(q)
     print(q.x[:, 0].min(), q.x[:, 0].max(), q.x[:, 0].mean(), q.x[:, 0])
     if q.x.shape[1] > 1:
         print(q.x[:, 1].min(), q.x[:, 1].max(), q.x[:, 1].mean(), q.x[:, 1])
     else:
         print(q.pert)
+        print(q.pert_idx)
     print(q.y.min(), q.y.max(), q.y.mean(), q.y)
 
     for epoch in range(1, args.epochs + 1):
