@@ -468,10 +468,12 @@ def plot_perturbation(
     model.eval()
     with torch.no_grad():
         for batch_data in loader:
+            print(batch_data)
             batch_size = len(batch_data.y)
             batch_data.to(device)
             x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 1) in new version
-            ori_gene_values = x[:, 0].view(batch_size, n_genes)
+            ori_gene_values = x[:, 0].view(-1, n_genes)
+            pert_flags = x[:, 1].long().view(-1, n_genes)
 
             # Reconstruct pert_flags from pert_idx (new version)
             pert_flags = torch.zeros(
