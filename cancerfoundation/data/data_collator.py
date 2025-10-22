@@ -197,9 +197,13 @@ class AnnDataCollator:
         padded_genes = torch.stack(padded_genes, dim=0).to(device)
         padded_expressions = torch.stack(padded_expressions, dim=0).to(device)
 
+        # Create padding mask: True indicates a padded position
+        gene_key_padding_mask = padded_genes.eq(self.pad_token_id)
+
         data_dict = {
             "gene": padded_genes,
             "expr": padded_expressions,
+            "gene_key_padding_mask": gene_key_padding_mask,
         }
 
         # mask
@@ -264,9 +268,13 @@ class AnnDataCollator:
         padded_pcpt_genes = torch.stack(padded_pcpt_genes, dim=0).to(device)
         padded_pcpt_expressions = torch.stack(padded_pcpt_expressions, dim=0).to(device)
 
+        # Create padding mask: True indicates a padded position
+        pcpt_key_padding_mask = padded_pcpt_genes.eq(self.pad_token_id)
+
         data_dict = {
             "pcpt_gene": padded_pcpt_genes,
             "pcpt_expr": padded_pcpt_expressions,
+            "pcpt_key_padding_mask": pcpt_key_padding_mask,
         }
         return data_dict
 
@@ -404,11 +412,17 @@ class AnnDataCollator:
         padded_gen_genes = torch.stack(padded_gen_genes, dim=0)
         padded_gen_expressions = torch.stack(padded_gen_expressions, dim=0)
 
+        # Create padding masks: True indicates a padded position
+        pcpt_key_padding_mask = padded_pcpt_genes.eq(self.pad_token_id)
+        gen_key_padding_mask = padded_gen_genes.eq(self.pad_token_id)
+
         data_dict = {
             "pcpt_gene": padded_pcpt_genes,
             "pcpt_expr": padded_pcpt_expressions,
             "gen_gene": padded_gen_genes,
             "gen_expr_target": padded_gen_expressions,
+            "pcpt_key_padding_mask": pcpt_key_padding_mask,
+            "gen_key_padding_mask": gen_key_padding_mask,
         }
 
         return data_dict

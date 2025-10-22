@@ -472,10 +472,10 @@ class TransformerModule(nn.Module):
         """Prepares tensors for the generative forward pass."""
         pcpt_gene = tensors["pcpt_gene"]
         pcpt_expr = tensors["pcpt_expr"]
-        pcpt_key_padding_mask = pcpt_gene.eq(self.pad_token_id)
+        pcpt_key_padding_mask = tensors["pcpt_key_padding_mask"]
         gen_gene = tensors["gen_gene"]
         gen_expr_target = tensors["gen_expr_target"]
-        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
+        gen_key_padding_mask = tensors["gen_key_padding_mask"]
 
         return (
             pcpt_gene,
@@ -491,7 +491,7 @@ class TransformerModule(nn.Module):
         input_gene_ids = tensors["gene"]
         input_values = tensors["masked_expr"]
 
-        src_key_padding_mask = input_gene_ids.eq(self.pad_token_id)
+        src_key_padding_mask = tensors["gene_key_padding_mask"]
         target_values = tensors["expr"]
 
         return input_gene_ids, input_values, src_key_padding_mask, target_values
