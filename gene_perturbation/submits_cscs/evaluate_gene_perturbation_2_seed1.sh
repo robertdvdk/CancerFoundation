@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=evaluate_gene_perturbation_2
+#SBATCH --job-name=evaluate_gene_perturbation_2_1
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=01:00:00
 #SBATCH --partition=normal
@@ -21,12 +21,12 @@ srun -ul --environment=../bionemo_clariden.toml bash -c "
     LOCAL_RANK=\${SLURM_LOCALID} \
     WORLD_SIZE=\${SLURM_NTASKS} \
     python run_perturbation.py \
-    --checkpoint ../save/train_medium_condtech_my_init_weights_4gpu_lrx2_955577/epoch_epoch=14.ckpt \
+    --checkpoint ../save/train_medium_condtech_my_init_weights_4gpu_lrx2_957412/epoch_epoch=14.ckpt \
     --data-name adamson \
     --epochs 15 \
     --lr 1e-4 \
     --batch-size 16 \
     --eval-batch-size 16 \
-    --save-dir ./my_results/myinit_lrx2_seed2 \
-    --seed 2
+    --save-dir ./my_results/myinit_lrx2_2_seed1 \
+    --seed 1
 "
