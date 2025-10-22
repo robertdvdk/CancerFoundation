@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=evaluate_gene_perturbation_2_2
 #SBATCH --output=./%x_%j.out
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --partition=normal
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
