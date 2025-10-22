@@ -12,7 +12,7 @@ set -x
 
 ulimit -c 0
 
-srun -ul --environment=./bionemo_clariden.toml bash -c "
+srun -ul --environment=../bionemo_clariden.toml bash -c "
     pip install cell-gears==0.0.2
     MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \
     MASTER_PORT=29500 \
