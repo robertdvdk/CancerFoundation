@@ -300,26 +300,6 @@ def parse_args():
         "--max_seq_len", type=int, default=1536, help="Maximum sequence length"
     )
 
-    # Objectives
-    parser.add_argument(
-        "--MLM", action="store_true", default=True, help="Use masked language modeling"
-    )
-    parser.add_argument(
-        "--CLS", action="store_true", default=False, help="Use celltype classification"
-    )
-    parser.add_argument(
-        "--CCE",
-        action="store_true",
-        default=False,
-        help="Use contrastive cell embedding",
-    )
-    parser.add_argument(
-        "--MVC", action="store_true", default=False, help="Use masked value prediction"
-    )
-    parser.add_argument(
-        "--ECS", action="store_true", default=False, help="Use elastic cell similarity"
-    )
-
     # Logging and output
     parser.add_argument(
         "--log_interval", type=int, default=100, help="Logging interval"
@@ -710,8 +690,9 @@ def predict(
             preds = []
             for batch_data in loader:
                 batch_data.to(device)
-                batch_size = len(batch_data.y)
                 x: torch.Tensor = batch_data.x
+                # Infer batch_size from the shape of x (batch_size * n_genes, 2)
+                batch_size = x.shape[0] // n_genes
                 ori_gene_values = x[:, 0].view(batch_size, n_genes)
                 pert_flags = x[:, 1].long().view(batch_size, n_genes)
 
