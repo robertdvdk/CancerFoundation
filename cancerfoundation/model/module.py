@@ -423,7 +423,8 @@ class TransformerModule(nn.Module):
         self, condition_labels: Optional[Tensor] = None
     ) -> None:
         """Validates that condition labels are provided if and only if conditions are defined for the model."""
-        assert bool(self.conditions) == bool(condition_labels)
+        # Use 'is not None' instead of bool() to avoid graph breaks in torch.compile
+        assert (self.conditions is not None) == (condition_labels is not None)
 
     def _extend_output(
         self,

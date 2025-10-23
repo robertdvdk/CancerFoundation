@@ -423,21 +423,103 @@ def create_model(args, vocab, genes, checkpoint_file=None):
     # If checkpoint_file exists, load from checkpoint
     if checkpoint_file is not None and checkpoint_file.exists():
         logger_msg = f"Loading model from checkpoint: {checkpoint_file}"
-        try:
-            model = CancerFoundation.load_from_checkpoint(
-                str(checkpoint_file),
-                vocab=vocab,
-                perturbation=True,
-                strict=False,
-                their_init_weights=False,
-                compile_model=False,
-                dropout=args.dropout,
-            )
-            print(logger_msg)
-        except Exception as e:
-            print(f"Error loading checkpoint: {e}")
-            print("Creating new model instead...")
-            model = None
+        print(logger_msg)
+
+        # Load checkpoint
+        chkpt = torch.load(checkpoint_file, weights_only=False)
+
+        # Check if keys have _orig_mod prefix (from compiled models)
+        if "state_dict" in chkpt:
+            first_key = list(chkpt["state_dict"].keys())[0]
+            if "_orig_mod" in first_key:
+                print("Detected compiled model checkpoint. Remapping keys...")
+                new_state_dict = {}
+                for key in chkpt["state_dict"].keys():
+                    new_key = key.replace("._orig_mod", "")
+                    new_state_dict[new_key] = chkpt["state_dict"][key]
+                chkpt["state_dict"] = new_state_dict
+
+                # Save the modified checkpoint temporarily
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", suffix=".ckpt", delete=False
+                ) as tmp:
+                    temp_checkpoint_path = tmp.name
+                    torch.save(chkpt, tmp)
+
+                try:
+                    model = CancerFoundation.load_from_checkpoint(
+                        temp_checkpoint_path,
+                        vocab=vocab,
+                        perturbation=True,
+                        strict=False,
+                        their_init_weights=False,
+                        compile_model=False,
+                        dropout=args.dropout,
+                    )
+
+                    # Verify which keys matched/didn't match
+                    model_keys = set(model.state_dict().keys())
+                    checkpoint_keys = set(new_state_dict.keys())
+
+                    missing_in_checkpoint = model_keys - checkpoint_keys
+                    unexpected_in_checkpoint = checkpoint_keys - model_keys
+
+                    if missing_in_checkpoint:
+                        print(
+                            f"\nWarning: {len(missing_in_checkpoint)} keys in model but not in checkpoint:"
+                        )
+                        for key in sorted(
+                            list(missing_in_checkpoint)[:10]
+                        ):  # Show first 10
+                            print(f"  - {key}")
+                        if len(missing_in_checkpoint) > 10:
+                            print(f"  ... and {len(missing_in_checkpoint) - 10} more")
+
+                    if unexpected_in_checkpoint:
+                        print(
+                            f"\nWarning: {len(unexpected_in_checkpoint)} keys in checkpoint but not in model:"
+                        )
+                        for key in sorted(
+                            list(unexpected_in_checkpoint)[:10]
+                        ):  # Show first 10
+                            print(f"  - {key}")
+                        if len(unexpected_in_checkpoint) > 10:
+                            print(
+                                f"  ... and {len(unexpected_in_checkpoint) - 10} more"
+                            )
+
+                    if not missing_in_checkpoint and not unexpected_in_checkpoint:
+                        print("\n✓ All keys matched perfectly after remapping!")
+                    else:
+                        matched_keys = len(model_keys & checkpoint_keys)
+                        total_keys = len(model_keys)
+                        print(
+                            f"\n✓ {matched_keys}/{total_keys} keys matched successfully"
+                        )
+
+                    print("Model loaded successfully with remapped keys!")
+                finally:
+                    # Clean up temporary file
+                    import os
+
+                    os.unlink(temp_checkpoint_path)
+            else:
+                # No remapping needed
+                model = CancerFoundation.load_from_checkpoint(
+                    str(checkpoint_file),
+                    vocab=vocab,
+                    perturbation=True,
+                    strict=True,
+                    their_init_weights=False,
+                    compile_model=False,
+                    dropout=args.dropout,
+                )
+                print("Model loaded successfully!")
+        else:
+            raise ValueError("Checkpoint does not contain 'state_dict' key")
+
     else:
         model = None
 

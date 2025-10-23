@@ -45,6 +45,7 @@ class PerturbationTransformer(TransformerModule):
             pcpt_total_embs=total_embs,
             gen_total_embs=None,
             pcpt_key_padding_mask=src_key_padding_mask,
+            gen_key_padding_mask=None,
         )
 
         return output

@@ -151,14 +151,14 @@ class RefactoredCFGenerator(nn.Module):
         # 2. Create the combined key padding mask
         src_key_padding_mask = None
         if pcpt_key_padding_mask is not None or gen_key_padding_mask is not None:
-            if pcpt_key_padding_mask is None:
-                pcpt_key_padding_mask = torch.zeros(
-                    pcpt_total_embs.shape[:2], dtype=torch.bool, device=src.device
-                )
-            if gen_key_padding_mask is None:
-                gen_key_padding_mask = torch.zeros(
-                    gen_total_embs.shape[:2], dtype=torch.bool, device=src.device
-                )
+            # Both masks should be provided together for consistency
+            assert (
+                pcpt_key_padding_mask is not None
+            ), "If any mask is provided, both must be provided"
+            assert (
+                gen_key_padding_mask is not None
+            ), "If any mask is provided, both must be provided"
+
             src_key_padding_mask = torch.cat(
                 (pcpt_key_padding_mask, gen_key_padding_mask), dim=1
             )
@@ -265,18 +265,12 @@ class MHA(nn.Module):
         )
         total_seq_len = pcpt_seq_len + gen_seq_len
 
-        if pcpt_key_padding_mask is None:
-            pcpt_key_padding_mask = (
-                torch.zeros(pcpt_total_embs.shape[0], pcpt_seq_len)
-                .bool()
-                .to(pcpt_total_embs.device)
-            )
-        if gen_key_padding_mask is None:
-            gen_key_padding_mask = (
-                torch.zeros(gen_total_embs.shape[0], gen_seq_len)
-                .bool()
-                .to(pcpt_total_embs.device)
-            )
+        # Padding masks should be provided by the caller to avoid dynamic tensor creation
+        # This is important for torch.compile compatibility
+        assert (
+            pcpt_key_padding_mask is not None
+        ), "pcpt_key_padding_mask must be provided"
+        assert gen_key_padding_mask is not None, "gen_key_padding_mask must be provided"
 
         key_padding_mask = torch.cat(
             [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
@@ -413,9 +407,6 @@ class CFLayer(nn.Module):
         Returns:
             A tuple of (perceptual_output, generative_output) tensors after processing.
         """
-        pcpt_key_padding_mask_ = pcpt_key_padding_mask
-        gen_key_padding_mask_ = gen_key_padding_mask
-
         if self.norm_scheme == "pre":
             pcpt_total_embs = self.norm1(pcpt_total_embs)
             if gen_total_embs is not None:
@@ -423,8 +414,8 @@ class CFLayer(nn.Module):
             pcpt_total_embs2, gen_total_embs2 = self.self_attn(
                 pcpt_total_embs,
                 gen_total_embs,
-                pcpt_key_padding_mask=pcpt_key_padding_mask_,
-                gen_key_padding_mask=gen_key_padding_mask_,
+                pcpt_key_padding_mask=pcpt_key_padding_mask,
+                gen_key_padding_mask=gen_key_padding_mask,
             )[0]
             pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
             pcpt_total_embs = self.norm2(pcpt_total_embs)
@@ -444,8 +435,8 @@ class CFLayer(nn.Module):
             pcpt_total_embs2, gen_total_embs2 = self.self_attn(
                 pcpt_total_embs,
                 gen_total_embs,
-                pcpt_key_padding_mask=pcpt_key_padding_mask_,
-                gen_key_padding_mask=gen_key_padding_mask_,
+                pcpt_key_padding_mask=pcpt_key_padding_mask,
+                gen_key_padding_mask=gen_key_padding_mask,
             )[0]
             pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
             pcpt_total_embs = self.norm1(pcpt_total_embs)
