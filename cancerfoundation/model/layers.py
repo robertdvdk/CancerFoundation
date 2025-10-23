@@ -107,13 +107,15 @@ class RefactoredCFGenerator(nn.Module):
         if cache_key not in self._mask_cache:
             # Create the custom attention mask
             # Shape: (total_seq_len, total_seq_len)
-            src_mask = torch.zeros(total_seq_len, total_seq_len, dtype=torch.bool)
+            src_mask = torch.zeros(
+                total_seq_len, total_seq_len, dtype=torch.bool, device=device
+            )
             src_mask[:, pcpt_seq_len:] = True  # Block attention to generative tokens
             src_mask.diagonal().fill_(False)  # Allow tokens to attend to themselves
             self._mask_cache[cache_key] = src_mask
 
         # Return cached mask on the correct device
-        return self._mask_cache[cache_key].to(device)
+        return self._mask_cache[cache_key]
 
     def forward(
         self,
@@ -168,7 +170,10 @@ class RefactoredCFGenerator(nn.Module):
 
         # --- Call the standard Transformer Encoder ---
         output = self.transformer_encoder(
-            src=src, mask=src_mask, src_key_padding_mask=src_key_padding_mask
+            src=src,
+            mask=src_mask,
+            src_key_padding_mask=src_key_padding_mask,
+            is_causal=False,
         )
 
         # --- Post-processing Step ---

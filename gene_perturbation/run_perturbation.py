@@ -353,7 +353,9 @@ def load_data(args, logger) -> PertData:
     logger.info(f"Loading data from {args.data_dir}")
     pert_data = PertData(args.data_dir)
     pert_data.load(data_name=args.data_name)
-    pert_data.prepare_split(split=args.split, seed=args.seed)
+    pert_data.prepare_split(
+        split=args.split, seed=42
+    )  # We always keep the seed 42, because we want the test set to be the same for every run
     pert_data.get_dataloader(
         batch_size=args.batch_size, test_batch_size=args.eval_batch_size
     )
