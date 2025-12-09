@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from .layers import CFGenerator, CFLayer
+from .layers import RefactoredCFGenerator, QuickCFGenerator, CFLayer, CFGenerator
 
 from .grad_reverse import grad_reverse
 
@@ -155,7 +155,9 @@ class TransformerModule(nn.Module):
                     encoder_layer=encoder_layers, num_layers=nlayers
                 )
                 self.flag_encoder = nn.Embedding(2, d_model)
-                self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
+                self.gene_encoder = GeneEncoder(
+                    ntoken, d_model, padding_idx=pad_token_id
+                )
             elif gen_method == "theirs":
                 encoder_layers = CFLayer(
                     d_model,
@@ -173,31 +175,28 @@ class TransformerModule(nn.Module):
                     ntoken, d_model, padding_idx=pad_token_id
                 )
             elif gen_method == "mine":
-                encoder_layer = nn.TransformerEncoderLayer(
+                self.transformer_encoder = RefactoredCFGenerator(
                     d_model=d_model,
                     nhead=nhead,
                     dim_feedforward=d_hid,
                     dropout=dropout,
-                    activation=activation,
-                    layer_norm_eps=1e-5,
-                    batch_first=True,
-                    norm_first=norm_first,
+                    norm_scheme=self.norm_scheme,
+                    num_layers=nlayers,
+                )
+                self.generative_flag = nn.Parameter(torch.randn(d_model))
+                self.gene_encoder = GeneEncoder(
+                    ntoken, d_model, padding_idx=pad_token_id
                 )
 
-                # Create the standard Transformer Encoder by stacking the layers
-                self.transformer_encoder = nn.TransformerEncoder(
-                    encoder_layer=encoder_layer,
+            elif gen_method == "quick":
+                self.transformer_encoder = QuickCFGenerator(
+                    d_model=d_model,
+                    nhead=nhead,
+                    dim_feedforward=d_hid,
+                    dropout=dropout,
+                    norm_scheme=self.norm_scheme,
                     num_layers=nlayers,
-                    norm=None,
                 )
-                # self.transformer_encoder = RefactoredCFGenerator(
-                #     d_model=d_model,
-                #     nhead=nhead,
-                #     dim_feedforward=d_hid,
-                #     dropout=dropout,
-                #     norm_scheme=self.norm_scheme,
-                #     num_layers=nlayers,
-                # )
                 self.generative_flag = nn.Parameter(torch.randn(d_model))
                 self.gene_encoder = GeneEncoder(
                     ntoken, d_model, padding_idx=pad_token_id
@@ -237,7 +236,7 @@ class TransformerModule(nn.Module):
     def init_weights(self) -> None:
         """Initializes the weights of the gene embedding layer."""
         initrange = 0.1
-        self.encoder.embedding.weight.data.uniform_(-initrange, initrange)
+        self.gene_encoder.embedding.weight.data.uniform_(-initrange, initrange)
 
     def embed(
         self,
@@ -405,21 +404,12 @@ class TransformerModule(nn.Module):
         if input_cell_emb is not None:
             pcpt_total_embs[:, 0, :] = input_cell_emb
 
-        out = self.transformer_encoder(
-            src=torch.cat((pcpt_total_embs, gen_total_embs), dim=1),
+        pcpt_output, gen_output = self.transformer_encoder(
+            pcpt_total_embs=pcpt_total_embs,
+            gen_total_embs=gen_total_embs,
             src_key_padding_mask=src_key_padding_mask,
-            mask=attn_mask,
+            attn_mask=attn_mask,
         )
-        # pcpt_output, gen_output = self.transformer_encoder(
-
-        #     # pcpt_total_embs,
-        #     # gen_total_embs,
-        #     # src_key_padding_mask,
-        #     # attn_mask
-        # )
-        print(out.shape)
-        pcpt_output = out[:, : pcpt_genes.size(1), :]
-        gen_output = out[:, pcpt_genes.size(1) :, :]
         return pcpt_output, gen_output
 
     def _get_cell_emb_from_layer(

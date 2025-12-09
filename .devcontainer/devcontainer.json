@@ -6,6 +6,8 @@
 	"runArgs": [
     "--gpus",
     "all",
+	"--shm-size",
+    "32g", // Set shared memory to a high value, e.g., 32GB, for large datasets
 	"--env-file",
 	".devcontainer/devcontainer.env" // use this to set environment variables such as WANDB_API_KEY
 	],

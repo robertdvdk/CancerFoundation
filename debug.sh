@@ -26,4 +26,5 @@ python pretrain.py \
     --normalise-bins \
     --conditions technology \
     --where-condition end \
-    --their-init-weights
+    --their-init-weights \
+    --compile
