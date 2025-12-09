@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from .layers import CFGenerator, CFLayer, RefactoredCFGenerator
+from .layers import CFGenerator, CFLayer
 
 from .grad_reverse import grad_reverse
 
@@ -173,14 +173,31 @@ class TransformerModule(nn.Module):
                     ntoken, d_model, padding_idx=pad_token_id
                 )
             elif gen_method == "mine":
-                self.transformer_encoder = RefactoredCFGenerator(
+                encoder_layer = nn.TransformerEncoderLayer(
                     d_model=d_model,
                     nhead=nhead,
                     dim_feedforward=d_hid,
                     dropout=dropout,
-                    norm_scheme=self.norm_scheme,
-                    num_layers=nlayers,
+                    activation=activation,
+                    layer_norm_eps=1e-5,
+                    batch_first=True,
+                    norm_first=norm_first,
                 )
+
+                # Create the standard Transformer Encoder by stacking the layers
+                self.transformer_encoder = nn.TransformerEncoder(
+                    encoder_layer=encoder_layer,
+                    num_layers=nlayers,
+                    norm=None,
+                )
+                # self.transformer_encoder = RefactoredCFGenerator(
+                #     d_model=d_model,
+                #     nhead=nhead,
+                #     dim_feedforward=d_hid,
+                #     dropout=dropout,
+                #     norm_scheme=self.norm_scheme,
+                #     num_layers=nlayers,
+                # )
                 self.generative_flag = nn.Parameter(torch.randn(d_model))
                 self.gene_encoder = GeneEncoder(
                     ntoken, d_model, padding_idx=pad_token_id
@@ -263,7 +280,8 @@ class TransformerModule(nn.Module):
         output = self.transformer_encoder(
             pcpt_total_embs=total_embs,
             gen_total_embs=None,
-            pcpt_key_padding_mask=src_key_padding_mask,
+            src_key_padding_mask=src_key_padding_mask,
+            src_mask=torch.zeros((total_embs.shape[0], total_embs.shape[0])),
         )
 
         return output
@@ -315,6 +333,8 @@ class TransformerModule(nn.Module):
         pcpt_key_padding_mask: Tensor,
         gen_genes: Tensor,
         gen_key_padding_mask: Tensor,
+        src_key_padding_mask: Tensor,
+        attn_mask: Tensor,
         conditions: Optional[Dict] = None,
         input_cell_emb: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor]:
@@ -385,12 +405,21 @@ class TransformerModule(nn.Module):
         if input_cell_emb is not None:
             pcpt_total_embs[:, 0, :] = input_cell_emb
 
-        pcpt_output, gen_output = self.transformer_encoder(
-            pcpt_total_embs,
-            gen_total_embs,
-            pcpt_key_padding_mask=pcpt_key_padding_mask,
-            gen_key_padding_mask=gen_key_padding_mask,
+        out = self.transformer_encoder(
+            src=torch.cat((pcpt_total_embs, gen_total_embs), dim=1),
+            src_key_padding_mask=src_key_padding_mask,
+            mask=attn_mask,
         )
+        # pcpt_output, gen_output = self.transformer_encoder(
+
+        #     # pcpt_total_embs,
+        #     # gen_total_embs,
+        #     # src_key_padding_mask,
+        #     # attn_mask
+        # )
+        print(out.shape)
+        pcpt_output = out[:, : pcpt_genes.size(1), :]
+        gen_output = out[:, pcpt_genes.size(1) :, :]
         return pcpt_output, gen_output
 
     def _get_cell_emb_from_layer(
@@ -477,6 +506,11 @@ class TransformerModule(nn.Module):
         gen_gene = tensors["gen_gene"]
         gen_expr_target = tensors["gen_expr_target"]
         gen_key_padding_mask = tensors["gen_key_padding_mask"]
+        attn_mask = tensors["attn_mask"]
+
+        src_key_padding_mask = torch.cat(
+            [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
+        )
 
         return (
             pcpt_gene,
@@ -485,6 +519,8 @@ class TransformerModule(nn.Module):
             gen_gene,
             gen_expr_target,
             gen_key_padding_mask,
+            src_key_padding_mask,
+            attn_mask,
         )
 
     def _prepare_perceptual_input(self, tensors: dict[str, torch.Tensor]):
@@ -522,6 +558,8 @@ class TransformerModule(nn.Module):
                 gen_gene,
                 gen_expr_target,
                 gen_key_padding_mask,
+                src_key_padding_mask,
+                attn_mask,
             ) = self._prepare_generative_input(tensors)
             output_dict = self.generative_forward(
                 pcpt_gene,
@@ -529,6 +567,8 @@ class TransformerModule(nn.Module):
                 pcpt_key_padding_mask,
                 gen_gene,
                 gen_key_padding_mask,
+                src_key_padding_mask,
+                attn_mask,
                 conditions=conditions_batch,
             )
 
@@ -554,6 +594,8 @@ class TransformerModule(nn.Module):
                 pcpt_key_padding_mask,
                 gen_gene,
                 gen_key_padding_mask,
+                src_key_padding_mask,
+                attn_mask,
                 input_cell_emb=previous_cell_embs,
                 conditions=conditions_batch,
             )["gen_preds"]
@@ -629,6 +671,8 @@ class TransformerModule(nn.Module):
         pcpt_key_padding_mask: Tensor,
         gen_genes: Tensor,
         gen_key_padding_mask: Tensor,
+        src_key_padding_mask: Tensor,
+        attn_mask: Tensor,
         conditions: Optional[Dict] = None,
         do_sample: bool = False,
         input_cell_emb: Optional[Tensor] = None,
@@ -654,6 +698,8 @@ class TransformerModule(nn.Module):
             pcpt_key_padding_mask,
             gen_genes,
             gen_key_padding_mask,
+            src_key_padding_mask,
+            attn_mask,
             conditions,
             input_cell_emb=input_cell_emb,
         )

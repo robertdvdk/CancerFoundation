@@ -388,6 +388,11 @@ def get_args():
         help="Whether to use the weight initialisation from before.",
     )
 
+    parser.add_argument(
+        "--save-every",
+        action="store_true",
+        help="Whether to save every epoch.",
+    )
     return parser.parse_args()
 
 

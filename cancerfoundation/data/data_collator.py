@@ -416,13 +416,21 @@ class AnnDataCollator:
         pcpt_key_padding_mask = padded_pcpt_genes.eq(self.pad_token_id)
         gen_key_padding_mask = padded_gen_genes.eq(self.pad_token_id)
 
+        # Create attention mask to prevent gen tokens from attending to other gen tokens
+        L_pcpt = padded_pcpt_genes.shape[1]
+        L_gen = padded_gen_genes.shape[1]
+        attn_mask = torch.zeros((L_pcpt + L_gen, L_pcpt + L_gen), dtype=torch.bool)
+        attn_mask[L_pcpt:, L_pcpt:] = True
+        attn_mask[L_pcpt:, L_pcpt:].fill_diagonal_(False)
+
         data_dict = {
             "pcpt_gene": padded_pcpt_genes,
             "pcpt_expr": padded_pcpt_expressions,
+            "pcpt_key_padding_mask": pcpt_key_padding_mask,
             "gen_gene": padded_gen_genes,
             "gen_expr_target": padded_gen_expressions,
-            "pcpt_key_padding_mask": pcpt_key_padding_mask,
             "gen_key_padding_mask": gen_key_padding_mask,
+            "attn_mask": attn_mask,
         }
 
         return data_dict

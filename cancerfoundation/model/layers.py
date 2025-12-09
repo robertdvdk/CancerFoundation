@@ -59,7 +59,8 @@ class RefactoredCFGenerator(nn.Module):
         ], "norm_scheme must be either 'pre' or 'post'"
 
         # Map norm_scheme to the 'norm_first' parameter in the standard layer
-        norm_first = True if norm_scheme == "pre" else False
+        # norm_first = True if norm_scheme == "pre" else False
+        norm_first = False
 
         # Create a standard Transformer Encoder Layer
         encoder_layer = nn.TransformerEncoderLayer(
@@ -80,49 +81,12 @@ class RefactoredCFGenerator(nn.Module):
             norm=norm,
         )
 
-        # Cache for attention masks to avoid recreation on every forward pass
-        self._mask_cache = {}
-
-    def _create_attention_mask(
-        self, pcpt_seq_len: int, gen_seq_len: int, device: torch.device
-    ) -> Tensor:
-        """
-        Create and cache the attention mask for the perceptual-generative architecture.
-
-        The mask prevents all tokens from attending to generative tokens (except themselves).
-        This enables parallel generation of all generative tokens conditioned on perceptual tokens.
-
-        Args:
-            pcpt_seq_len (int): Length of the perceptual sequence.
-            gen_seq_len (int): Length of the generative sequence.
-            device (torch.device): Device to place the mask on.
-
-        Returns:
-            Tensor: Boolean attention mask of shape (total_seq_len, total_seq_len).
-        """
-        total_seq_len = pcpt_seq_len + gen_seq_len
-        cache_key = (pcpt_seq_len, gen_seq_len)
-
-        # Check if mask is already cached
-        if cache_key not in self._mask_cache:
-            # Create the custom attention mask
-            # Shape: (total_seq_len, total_seq_len)
-            src_mask = torch.zeros(
-                total_seq_len, total_seq_len, dtype=torch.bool, device=device
-            )
-            src_mask[:, pcpt_seq_len:] = True  # Block attention to generative tokens
-            src_mask.diagonal().fill_(False)  # Allow tokens to attend to themselves
-            self._mask_cache[cache_key] = src_mask
-
-        # Return cached mask on the correct device
-        return self._mask_cache[cache_key]
-
     def forward(
         self,
         pcpt_total_embs: Tensor,
-        gen_total_embs: Optional[Tensor],
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
+        gen_total_embs: Tensor,
+        src_key_padding_mask: Tensor,
+        attn_mask,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """
         Passes the perceptual and generative sequences through the encoder.
@@ -137,41 +101,41 @@ class RefactoredCFGenerator(nn.Module):
             A tuple of the final (perceptual_output, generative_output) tensors.
         """
         # If there's no generative sequence, process only the perceptual one
-        if gen_total_embs is None:
-            output = self.transformer_encoder(
-                src=pcpt_total_embs, src_key_padding_mask=pcpt_key_padding_mask
-            )
-            return output, None
+        # if gen_total_embs is None:
+        #     output = self.transformer_encoder(
+        #         src=pcpt_total_embs, src_key_padding_mask=pcpt_key_padding_mask
+        #     )
+        #     return output, None
 
         # --- Pre-processing Step ---
         pcpt_seq_len = pcpt_total_embs.shape[1]
-        gen_seq_len = gen_total_embs.shape[1]
+        # gen_seq_len = gen_total_embs.shape[1]
 
         # 1. Concatenate inputs
         src = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
 
         # 2. Create the combined key padding mask
-        src_key_padding_mask = None
-        if pcpt_key_padding_mask is not None or gen_key_padding_mask is not None:
-            # Both masks should be provided together for consistency
-            assert (
-                pcpt_key_padding_mask is not None
-            ), "If any mask is provided, both must be provided"
-            assert (
-                gen_key_padding_mask is not None
-            ), "If any mask is provided, both must be provided"
+        # src_key_padding_mask = None
+        # if pcpt_key_padding_mask is not None or gen_key_padding_mask is not None:
+        #     # Both masks should be provided together for consistency
+        #     assert (
+        #         pcpt_key_padding_mask is not None
+        #     ), "If any mask is provided, both must be provided"
+        #     assert (
+        #         gen_key_padding_mask is not None
+        #     ), "If any mask is provided, both must be provided"
 
-            src_key_padding_mask = torch.cat(
-                (pcpt_key_padding_mask, gen_key_padding_mask), dim=1
-            )
+        #     src_key_padding_mask = torch.cat(
+        #         (pcpt_key_padding_mask, gen_key_padding_mask), dim=1
+        #     )
 
         # 3. Get the cached attention mask
-        src_mask = self._create_attention_mask(pcpt_seq_len, gen_seq_len, src.device)
+        # src_mask = self._create_attention_mask(pcpt_seq_len, gen_seq_len, src.device)
 
         # --- Call the standard Transformer Encoder ---
         output = self.transformer_encoder(
             src=src,
-            mask=src_mask,
+            mask=attn_mask,
             src_key_padding_mask=src_key_padding_mask,
             is_causal=False,
         )
@@ -242,8 +206,10 @@ class MHA(nn.Module):
         self,
         pcpt_total_embs: Tensor,
         gen_total_embs: Tensor,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
+        src_key_padding_mask,
+        src_mask,
+        # pcpt_key_padding_mask: Optional[Tensor] = None,
+        # gen_key_padding_mask: Optional[Tensor] = None,
         need_weights=False,
     ):
         """Performs the forward pass with perceptual and generative sequences.
@@ -263,23 +229,23 @@ class MHA(nn.Module):
         assert not need_weights
 
         if gen_total_embs is None:
-            return self._forward_perceptual(pcpt_total_embs, pcpt_key_padding_mask)
-        pcpt_seq_len, gen_seq_len = (
+            return self._forward_perceptual(pcpt_total_embs, src_key_padding_mask)
+        pcpt_seq_len, _ = (
             pcpt_total_embs.shape[1],
             0 if gen_total_embs is None else gen_total_embs.shape[1],
         )
-        total_seq_len = pcpt_seq_len + gen_seq_len
+        # total_seq_len = pcpt_seq_len + gen_seq_len
 
         # Padding masks should be provided by the caller to avoid dynamic tensor creation
         # This is important for torch.compile compatibility
-        assert (
-            pcpt_key_padding_mask is not None
-        ), "pcpt_key_padding_mask must be provided"
-        assert gen_key_padding_mask is not None, "gen_key_padding_mask must be provided"
+        # assert (
+        #     pcpt_key_padding_mask is not None
+        # ), "pcpt_key_padding_mask must be provided"
+        # assert gen_key_padding_mask is not None, "gen_key_padding_mask must be provided"
 
-        key_padding_mask = torch.cat(
-            [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
-        ).to(pcpt_total_embs.device)
+        # key_padding_mask = torch.cat(
+        #     [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
+        # ).to(pcpt_total_embs.device)
 
         @lru_cache(maxsize=1)
         def make_mask(len, gen_len, device):
@@ -293,7 +259,7 @@ class MHA(nn.Module):
             attn_mask.diagonal().fill_(False)
             return attn_mask.to(device)
 
-        attn_mask = make_mask(total_seq_len, gen_seq_len, pcpt_total_embs.device)
+        # attn_mask = make_mask(total_seq_len, gen_seq_len, pcpt_total_embs.device)
 
         total_embs = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
 
@@ -301,8 +267,8 @@ class MHA(nn.Module):
             total_embs,
             total_embs,
             total_embs,
-            key_padding_mask=key_padding_mask.to(pcpt_total_embs.device),
-            attn_mask=attn_mask,
+            key_padding_mask=src_key_padding_mask,
+            attn_mask=src_mask,
             need_weights=need_weights,
         )
 
@@ -314,7 +280,9 @@ class MHA(nn.Module):
             total_embs,
             total_embs,
             total_embs,
-            key_padding_mask=key_padding_mask.to(key_padding_mask.device),
+            key_padding_mask=key_padding_mask.to(key_padding_mask.device)
+            if key_padding_mask is not None
+            else None,
         )
         return (out, None), (None, None)
 
@@ -398,8 +366,10 @@ class CFLayer(nn.Module):
         self,
         pcpt_total_embs: Tensor,
         gen_total_embs: Tensor,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
+        src_key_padding_mask,
+        src_mask,
+        # pcpt_key_padding_mask: Optional[Tensor] = None,
+        # gen_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
         """Passes the perceptual and generative sequences through the encoder layer.
 
@@ -419,8 +389,10 @@ class CFLayer(nn.Module):
             pcpt_total_embs2, gen_total_embs2 = self.self_attn(
                 pcpt_total_embs,
                 gen_total_embs,
-                pcpt_key_padding_mask=pcpt_key_padding_mask,
-                gen_key_padding_mask=gen_key_padding_mask,
+                src_key_padding_mask=src_key_padding_mask,
+                src_mask=src_mask,
+                # pcpt_key_padding_mask=pcpt_key_padding_mask,
+                # gen_key_padding_mask=gen_key_padding_mask,
             )[0]
             pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
             pcpt_total_embs = self.norm2(pcpt_total_embs)
@@ -440,8 +412,10 @@ class CFLayer(nn.Module):
             pcpt_total_embs2, gen_total_embs2 = self.self_attn(
                 pcpt_total_embs,
                 gen_total_embs,
-                pcpt_key_padding_mask=pcpt_key_padding_mask,
-                gen_key_padding_mask=gen_key_padding_mask,
+                src_key_padding_mask=src_key_padding_mask,
+                src_mask=src_mask,
+                # pcpt_key_padding_mask=pcpt_key_padding_mask,
+                # gen_key_padding_mask=gen_key_padding_mask,
             )[0]
             pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
             pcpt_total_embs = self.norm1(pcpt_total_embs)
@@ -496,8 +470,10 @@ class CFGenerator(nn.Module):
         self,
         pcpt_total_embs: Tensor,
         gen_total_embs: Tensor,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
+        src_key_padding_mask: Tensor,
+        src_mask,
+        # pcpt_key_padding_mask: Optional[Tensor] = None,
+        # gen_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
         """Passes the input through the stack of encoder layers.
 
@@ -510,21 +486,23 @@ class CFGenerator(nn.Module):
         Returns:
             A tuple of the final (perceptual_output, generative_output) tensors.
         """
-        if pcpt_key_padding_mask is not None:
-            _skpm_dtype = pcpt_key_padding_mask.dtype
-            if _skpm_dtype != torch.bool and not torch.is_floating_point(
-                pcpt_key_padding_mask
-            ):
-                raise AssertionError(
-                    "only bool and floating types of key_padding_mask are supported"
-                )
+        # if pcpt_key_padding_mask is not None:
+        #     _skpm_dtype = pcpt_key_padding_mask.dtype
+        #     if _skpm_dtype != torch.bool and not torch.is_floating_point(
+        #         pcpt_key_padding_mask
+        #     ):
+        #         raise AssertionError(
+        #             "only bool and floating types of key_padding_mask are supported"
+        #         )
 
         for mod in self.layers:
             pcpt_total_embs, gen_total_embs = mod(
                 pcpt_total_embs,
                 gen_total_embs,
-                pcpt_key_padding_mask,
-                gen_key_padding_mask,
+                src_key_padding_mask=src_key_padding_mask,
+                src_mask=src_mask,
+                # pcpt_key_padding_mask,
+                # gen_key_padding_mask,
             )
 
         if self.norm is not None:

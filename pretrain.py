@@ -29,6 +29,7 @@ def train_model(
     accumulate_grad_batches: int,
     val_check_interval: float,
     log_interval: int,
+    save_every: bool,
 ):
     """
     Train the model using PyTorch Lightning Trainer
@@ -54,7 +55,10 @@ def train_model(
     callbacks.append(MyProgressBar(refresh_rate=log_interval))
     # Model checkpointing
     checkpoint_callback = ModelCheckpoint(
-        dirpath=save_dir, filename="epoch_{epoch:02d}", every_n_epochs=1
+        dirpath=save_dir,
+        filename="epoch_{epoch:02d}",
+        every_n_epochs=1,
+        save_top_k=-1 if save_every else 1,
     )
     callbacks.append(checkpoint_callback)
 
@@ -199,6 +203,7 @@ def main():
         precision=args.precision,
         gradient_clip_val=args.gradient_clip_val,
         log_interval=args.log_interval,
+        save_every=args.save_every,
     )
 
 

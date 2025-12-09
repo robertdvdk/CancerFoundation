@@ -8,6 +8,70 @@
 #SBATCH --cpus-per-task=72
 #SBATCH --account=a132
 
+
+python pretrain.py \
+    --gpus 1 \
+    --save-dir "QQQ" \
+    --max-seq-len 1200 \
+    --batch-size 32 \
+    --nlayers 6 \
+    --nheads 8 \
+    --embsize 256 \
+    --d-hi 512 \
+    --epochs 15 \
+    --lr 0.0002 \
+    --warmup-ratio-or-step 5000 \
+    --val-check-interval 1.0 \
+    --trunc-by-sample \
+    --loss mse \
+    --balance-primary tissue \
+    --balance-secondary technology \
+    --train-path "./DATA/brain/processed_data/train" \
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp' \
+    --seed 0 \
+    --precision "bf16-mixed" \
+    --do-mvc \
+    --log-interval 100 \
+    --training-tasks "both" \
+    --gen-method "mine" \
+    --input-emb-style "mine" \
+    --conditions technology \
+    --where-condition end \
+    --compile
+
+
+python pretrain.py \
+    --gpus 1 \
+    --save-dir "QQQ" \
+    --max-seq-len 1200 \
+    --batch-size 32 \
+    --nlayers 6 \
+    --nheads 8 \
+    --embsize 256 \
+    --d-hi 512 \
+    --epochs 15 \
+    --lr 0.0002 \
+    --warmup-ratio-or-step 5000 \
+    --val-check-interval 1.0 \
+    --trunc-by-sample \
+    --loss mse \
+    --balance-primary tissue \
+    --balance-secondary technology \
+    --train-path "./DATA/brain/processed_data/train" \
+    --zero-percentages 0.2 0.4 0.6 \
+    --strategy='ddp' \
+    --seed 0 \
+    --precision "bf16-mixed" \
+    --do-mvc \
+    --log-interval 100 \
+    --training-tasks "both" \
+    --gen-method "orig" \
+    --input-emb-style "theirs" \
+    --conditions technology \
+    --compile \
+    --where-condition end
+
 set -x
 
 ulimit -c 0

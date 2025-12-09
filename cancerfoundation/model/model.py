@@ -404,3 +404,22 @@ class CancerFoundation(pl.LightningModule):
             raise ValueError("Unsupported file format. Use .safetensors, .pth, or .pt")
 
         return load_pretrained(self.model, tensors, gene_mapping, verbose=verbose)
+
+    def embed(self, data):
+        """Embeds an AnnData object using a trained model.
+
+        Args:
+            data: AnnData object containing the data to be embedded.
+
+        Returns:
+            Embeddings as a Torch tensor.
+        """
+
+        self.model.eval()
+        src = data.var.index
+        values = data.X
+        with torch.no_grad():
+            embeddings = self.model.embed(
+                src=src, values=values, src_key_padding_mask=None
+            )
+        return embeddings
