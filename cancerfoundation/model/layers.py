@@ -325,8 +325,6 @@ class CFGenerator(nn.Module):
         gen_total_embs: Tensor,
         src_key_padding_mask: Optional[Tensor] = None,
         attn_mask: Optional[Tensor] = None,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Pass the input through the encoder layers in turn.
         Args:
@@ -338,8 +336,6 @@ class CFGenerator(nn.Module):
         """
         pcpt_key_padding_mask = src_key_padding_mask[:, : pcpt_total_embs.shape[1]]
         gen_key_padding_mask = src_key_padding_mask[:, pcpt_total_embs.shape[1] :]
-        print(pcpt_key_padding_mask.shape)
-        print(gen_key_padding_mask.shape)
 
         if pcpt_key_padding_mask is not None:
             _skpm_dtype = pcpt_key_padding_mask.dtype

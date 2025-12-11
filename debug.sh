@@ -23,7 +23,6 @@ python pretrain.py \
     --training-tasks "both" \
     --gen-method "orig" \
     --input-emb-style "theirs" \
-    --normalise-bins \
     --conditions technology \
     --where-condition end \
     --their-init-weights \
