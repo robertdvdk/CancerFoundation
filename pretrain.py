@@ -123,6 +123,7 @@ def main():
         n_bins=args.n_bins,
         normalise_bins=args.normalise_bins,
         condition_token=args.where_condition == "begin",
+        num_workers=args.num_workers,
     )
     datamodule.setup(stage="fit")
 

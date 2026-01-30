@@ -155,9 +155,7 @@ class TransformerModule(nn.Module):
                     encoder_layer=encoder_layers, num_layers=nlayers
                 )
                 self.flag_encoder = nn.Embedding(2, d_model)
-                self.gene_encoder = GeneEncoder(
-                    ntoken, d_model, padding_idx=pad_token_id
-                )
+                self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
             elif gen_method == "theirs":
                 encoder_layers = CFLayer(
                     d_model,
@@ -230,13 +228,23 @@ class TransformerModule(nn.Module):
                 normalise_bins=normalise_bins,
             )
 
-        if their_init_weights:
-            self.init_weights()
+        # if their_init_weights:
+        #     self.init_weights()
 
-    def init_weights(self) -> None:
-        """Initializes the weights of the gene embedding layer."""
-        initrange = 0.1
-        self.gene_encoder.embedding.weight.data.uniform_(-initrange, initrange)
+    def reset_all_weights(model):
+        """Recursively reset all parameters in the model"""
+
+        @torch.no_grad()
+        def init_weights(m):
+            if hasattr(m, "reset_parameters"):
+                m.reset_parameters()
+
+        model.apply(init_weights)
+
+    # def init_weights(self) -> None:
+    #     """Initializes the weights of the gene embedding layer."""
+    #     initrange = 0.1
+    #     self.gene_encoder.embedding.weight.data.uniform_(-initrange, initrange)
 
     def embed(
         self,
@@ -280,7 +288,7 @@ class TransformerModule(nn.Module):
             pcpt_total_embs=total_embs,
             gen_total_embs=None,
             src_key_padding_mask=src_key_padding_mask,
-            src_mask=torch.zeros((total_embs.shape[0], total_embs.shape[0])),
+            attn_mask=torch.zeros((total_embs.shape[0], total_embs.shape[0])),
         )
 
         return output

@@ -538,8 +538,6 @@ class FlexTransformerLayer(nn.Module):
         key = key.transpose(1, 2)
         value = value.transpose(1, 2)
 
-        # --- THE CORE CHANGE: FlexAttention ---
-        # No 13GB mask tensor is ever created here.
         attn_out = flex_attention(query, key, value, block_mask=block_mask)
 
         # Reshape back: (Batch, Seq_Len, Dim)

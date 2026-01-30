@@ -66,6 +66,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         n_bins: int,
         normalise_bins: bool,
         condition_token: bool,
+        num_workers: int,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -83,6 +84,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         self.zero_percentages = zero_percentages
         self.normalise_bins = normalise_bins
         self.condition_token = condition_token
+        self.num_workers = num_workers
 
         # Setup token values based on embedding style
         if self.input_style == "category":
@@ -158,19 +160,14 @@ class SingleCellDataModule(pl.LightningDataModule):
         )
 
         batch_size = self.batch_size if train else self.batch_size
-        num_workers = 8
-        # if train:
-        #     num_workers = min(12, min(len(os.sched_getaffinity(0)), self.batch_size))
-        # else:
-        #     num_workers = 12
-        print(f"Using {num_workers} workers.")
+        print(f"Using {self.num_workers} workers.")
         return DataLoader(
             dataset,
             batch_size=batch_size,
             sampler=sampler,
             collate_fn=collator,
             drop_last=True,
-            num_workers=num_workers,
+            num_workers=self.num_workers,
             pin_memory=True,
         )
 

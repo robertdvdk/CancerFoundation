@@ -4,9 +4,12 @@ import os
 from typing import Any, List, Optional, Union
 import transformers
 import torch
+import numpy as np
+import scanpy as sc
 from cancerfoundation.model.perturbation_model import PerturbationTransformer
 from cancerfoundation.utils import load_pretrained
 from cancerfoundation.model.module import TransformerModule
+from cancerfoundation.data.preprocess import binning
 from cancerfoundation.loss import get_loss
 from safetensors import safe_open
 from cancerfoundation.loss import LossType
@@ -66,6 +69,7 @@ class CancerFoundation(pl.LightningModule):
         gen_method: str,
         their_init_weights: bool,
         perturbation: bool = False,
+        n_top_genes: int = 1200,
     ):
         """Initializes the CancerFoundation LightningModule.
 
@@ -102,7 +106,7 @@ class CancerFoundation(pl.LightningModule):
             zero_percentages (Optional[List[float]], optional): Percentages for balancing zero expression. Defaults to None.
         """
         super().__init__()
-        self.save_hyperparameters(ignore=["vocab"])
+        self.save_hyperparameters()
         self.vocab = vocab
         # Store all parameters
         self.n_bins = n_bins
@@ -133,6 +137,7 @@ class CancerFoundation(pl.LightningModule):
         self.cell_emb_style = cell_emb_style
         self.perturbation = perturbation
         self.their_init_weights = their_init_weights
+        self.n_top_genes = n_top_genes
 
         # Training configuration
         self.pad_token = "<pad>"
@@ -405,21 +410,103 @@ class CancerFoundation(pl.LightningModule):
 
         return load_pretrained(self.model, tensors, gene_mapping, verbose=verbose)
 
-    def embed(self, data):
-        """Embeds an AnnData object using a trained model.
+    @torch.no_grad()
+    def embed(self, adata, batch_size: int = 64) -> torch.Tensor:
+        """Embeds an AnnData object into cell embeddings.
+
+        Handles all preprocessing: gene intersection with vocab, HVG selection,
+        binning, and batched forward passes through the transformer.
 
         Args:
-            data: AnnData object containing the data to be embedded.
+            adata: AnnData object (h5ad). X should contain expression values
+                (dense or sparse).
+            batch_size: Batch size for inference.
 
         Returns:
-            Embeddings as a Torch tensor.
+            torch.Tensor of shape (n_cells, d_model) on CPU.
         """
-
         self.model.eval()
-        src = data.var.index
-        values = data.X
-        with torch.no_grad():
-            embeddings = self.model.embed(
-                src=src, values=values, src_key_padding_mask=None
+        device = next(self.model.parameters()).device
+
+        # Work on a copy to avoid mutating the input
+        data = adata.copy()
+        if hasattr(data.X, "toarray"):
+            data.X = data.X.toarray()
+
+        # Intersect genes with vocab
+        common_genes = list(set(self.vocab.keys()).intersection(set(data.var.index)))
+        data = data[:, common_genes].copy()
+
+        # Select highly variable genes
+        sc.pp.highly_variable_genes(data, n_top_genes=self.n_top_genes, layer=None)
+        data = data[:, data.var["highly_variable"]].copy()
+
+        # Bin expression values
+        normalise = self.model.decoder.normalise_bins
+        for idx in range(data.n_obs):
+            data.X[idx] = binning(data.X[idx], self.n_bins)
+            if normalise:
+                data.X[idx] = data.X[idx] / self.n_bins
+
+        # Build gene ID tensor
+        gene_ids = torch.LongTensor([self.vocab[g] for g in data.var.index])
+        count_matrix = data.X if isinstance(data.X, np.ndarray) else data.X.toarray()
+
+        # Embed in batches
+        embeddings = []
+        for i in range(0, len(data), batch_size):
+            batch_expr = torch.FloatTensor(count_matrix[i : i + batch_size]).to(device)
+            batch_genes = (
+                gene_ids.unsqueeze(0).expand(batch_expr.shape[0], -1).to(device)
             )
-        return embeddings
+
+            # Prepend CLS token
+            batch_genes = torch.cat(
+                [
+                    torch.full(
+                        (batch_expr.shape[0], 1),
+                        self.cls_token_id,
+                        dtype=torch.long,
+                        device=device,
+                    ),
+                    batch_genes,
+                ],
+                dim=1,
+            )
+            batch_expr = torch.cat(
+                [
+                    torch.full(
+                        (batch_expr.shape[0], 1),
+                        self.pad_value,
+                        dtype=batch_expr.dtype,
+                        device=device,
+                    ),
+                    batch_expr,
+                ],
+                dim=1,
+            )
+
+            padding_mask = torch.zeros(
+                batch_genes.shape, dtype=torch.bool, device=device
+            )
+
+            if self.model.use_generative_training:
+                # Returns (pcpt_output, gen_output) tuple
+                output = self.model.embed(
+                    src=batch_genes,
+                    values=batch_expr,
+                    src_key_padding_mask=padding_mask,
+                )
+                transformer_output = output[0]
+            else:
+                # Returns a single tensor
+                transformer_output = self.model.encode(
+                    src=batch_genes,
+                    values=batch_expr,
+                    src_key_padding_mask=padding_mask,
+                )
+
+            cell_emb = transformer_output[:, 0, :]  # CLS token
+            embeddings.append(cell_emb.cpu())
+
+        return torch.cat(embeddings, dim=0)

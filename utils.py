@@ -378,7 +378,7 @@ def get_args():
     parser.add_argument(
         "--gen-method",
         type=str,
-        choices=["theirs", "mine", "orig"],
+        choices=["theirs", "mine", "orig", "quick"],
         help="Which method to use for generative training.",
     )
 
@@ -392,6 +392,12 @@ def get_args():
         "--save-every",
         action="store_true",
         help="Whether to save every epoch.",
+    )
+
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        help="How many workers to use for the DataLoader.",
     )
     return parser.parse_args()
 
