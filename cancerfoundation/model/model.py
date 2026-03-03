@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Union
 import transformers
 import torch
 import numpy as np
+import pandas as pd
 import scanpy as sc
 from cancerfoundation.model.perturbation_model import PerturbationTransformer
 from cancerfoundation.utils import load_pretrained
@@ -15,6 +16,7 @@ from safetensors import safe_open
 from cancerfoundation.loss import LossType
 from pytorch_lightning.utilities.types import OptimizerLRSchedulerConfig
 import torch.nn.functional as F
+from tqdm import tqdm
 
 
 class CancerFoundation(pl.LightningModule):
@@ -411,7 +413,7 @@ class CancerFoundation(pl.LightningModule):
         return load_pretrained(self.model, tensors, gene_mapping, verbose=verbose)
 
     @torch.no_grad()
-    def embed(self, adata, batch_size: int = 64) -> torch.Tensor:
+    def embed(self, adata, batch_size: int = 64):
         """Embeds an AnnData object into cell embeddings.
 
         Handles all preprocessing: gene intersection with vocab, HVG selection,
@@ -423,7 +425,7 @@ class CancerFoundation(pl.LightningModule):
             batch_size: Batch size for inference.
 
         Returns:
-            torch.Tensor of shape (n_cells, d_model) on CPU.
+            pd.DataFrame with cell IDs as index and columns dim_0, dim_1, ...
         """
         self.model.eval()
         device = next(self.model.parameters()).device
@@ -453,8 +455,11 @@ class CancerFoundation(pl.LightningModule):
         count_matrix = data.X if isinstance(data.X, np.ndarray) else data.X.toarray()
 
         # Embed in batches
+        n_batches = (len(data) + batch_size - 1) // batch_size
         embeddings = []
-        for i in range(0, len(data), batch_size):
+        for i in tqdm(
+            range(0, len(data), batch_size), total=n_batches, desc="Embedding cells"
+        ):
             batch_expr = torch.FloatTensor(count_matrix[i : i + batch_size]).to(device)
             batch_genes = (
                 gene_ids.unsqueeze(0).expand(batch_expr.shape[0], -1).to(device)
@@ -509,4 +514,9 @@ class CancerFoundation(pl.LightningModule):
             cell_emb = transformer_output[:, 0, :]  # CLS token
             embeddings.append(cell_emb.cpu())
 
-        return torch.cat(embeddings, dim=0)
+        emb = torch.cat(embeddings, dim=0).numpy()
+        return pd.DataFrame(
+            emb,
+            index=adata.obs_names,
+            columns=[f"dim_{i}" for i in range(emb.shape[1])],
+        )

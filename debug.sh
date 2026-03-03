@@ -2,12 +2,11 @@ python pretrain.py \
     --gpus 1 \
     --save-dir ./save/CF-$(date +%b%d-%H-%M-%Y) \
     --max-seq-len 1200 \
-    --batch-size 32 \
     --nlayers 6 \
     --nheads 8 \
     --embsize 128 \
     --d-hid 256 \
-    --epochs 50 \
+    --epochs 2 \
     --lr 0.0001 \
     --warmup-ratio-or-step 1 \
     --trunc-by-sample \
@@ -15,15 +14,17 @@ python pretrain.py \
     --train-path "./DATA/brain/processed_data/train" \
     --balance-primary "technology" \
     --zero-percentages 0.2 0.4 0.6 \
-    --strategy='ddp' \
+    --strategy='auto' \
     --seed 0 \
-    --precision "bf16-mixed" \
     --do-mvc \
     --log-interval 50 \
     --training-tasks "both" \
-    --gen-method "orig" \
     --input-emb-style "theirs" \
     --conditions technology \
     --where-condition end \
     --their-init-weights \
+    --num-workers 8 \
+    --batch-size 64 \
+    --precision "bf16-mixed" \
+    --gen-method "quick" \
     --compile

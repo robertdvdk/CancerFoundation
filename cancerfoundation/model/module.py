@@ -313,7 +313,7 @@ class TransformerModule(nn.Module):
         """
         self._check_condition_labels(conditions)
 
-        src_embs = self.gene_encoder(src)
+        src_embs = self.encoder(src)
         self.cur_gene_token_embs = src_embs
 
         values = self.value_encoder(values)
@@ -1210,3 +1210,22 @@ class AdversarialDiscriminator(nn.Module):
         for layer in self._decoder:
             x = layer(x)
         return self.out_layer(x)
+
+
+class WassersteinDiscriminator(nn.Module):
+    def __init__(self, d_model: int, n_cls: int, nlayers: int = 3, scale=1.0):
+        super().__init__()
+        self._decoder = nn.ModuleList()
+        for i in range(nlayers - 1):
+            # spectral norm for Lipschitz constraint
+            self._decoder.append(nn.utils.spectral_norm(nn.Linear(d_model, d_model)))
+            self._decoder.append(nn.LeakyReLU())
+            self._decoder.append(nn.LayerNorm(d_model))
+        # outputs raw scores per class, no softmax
+        self.out_layer = nn.utils.spectral_norm(nn.Linear(d_model, n_cls))
+        self.scale = scale
+
+    def forward(self, x: Tensor) -> Tensor:
+        for layer in self._decoder:
+            x = layer(x)
+        return self.out_layer(x)  # (batch, n_cls) — raw scores
