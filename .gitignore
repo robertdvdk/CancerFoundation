@@ -31,3 +31,5 @@ lightning_logs/
 
 *.code-workspace
 *.ckpt
+
+debug_data/
