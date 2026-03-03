@@ -10,6 +10,9 @@ __pycache__/
 training_data/.cache
 training_data/data
 training_data/downloads
+.vscode/
+
+*.code-workspace
 
 
 save/
@@ -31,5 +34,10 @@ lightning_logs/
 
 *.code-workspace
 *.ckpt
+*.svg
 
-debug_data/
+# Data files
+training_data/.cache
+training_data/data
+training_data/downloads
+drug_response_prediction/data
