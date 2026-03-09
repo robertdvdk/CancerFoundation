@@ -15,7 +15,7 @@ ulimit -c 0
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 mkdir -p "$SAVE_DIR"
-TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/cancer_gpt/"
+TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
 
 srun -ul --environment=./bionemo_bristen.toml bash -c "
     MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \

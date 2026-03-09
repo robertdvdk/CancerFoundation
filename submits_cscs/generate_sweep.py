@@ -31,7 +31,7 @@ from pathlib import Path
 
 OUT_DIR = Path("submits_cscs/sweep")
 ENV_FILE = "./bionemo_bristen.toml"
-TRAIN_DIR = "/capstor/scratch/cscs/rvander/DATA/cancer_gpt/"
+TRAIN_DIR = "/capstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
 WANDB_PROJECT = "sweep"
 GPUS = 4
 CPUS_PER_TASK = 32
