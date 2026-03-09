@@ -1,22 +1,23 @@
-from pathlib import Path
-import pytorch_lightning as pl
 import os
+from pathlib import Path
 from typing import Any, List, Optional, Union
-import transformers
-import torch
+
 import numpy as np
 import pandas as pd
+import pytorch_lightning as pl
 import scanpy as sc
+import torch
+import torch.nn.functional as F
+import transformers
+from pytorch_lightning.utilities.types import OptimizerLRSchedulerConfig
+from safetensors import safe_open
+from tqdm import tqdm
+
+from cancerfoundation.data.preprocess import binning
+from cancerfoundation.loss import LossType, get_loss
+from cancerfoundation.model.module import TransformerModule
 from cancerfoundation.model.perturbation_model import PerturbationTransformer
 from cancerfoundation.utils import load_pretrained
-from cancerfoundation.model.module import TransformerModule
-from cancerfoundation.data.preprocess import binning
-from cancerfoundation.loss import get_loss
-from safetensors import safe_open
-from cancerfoundation.loss import LossType
-from pytorch_lightning.utilities.types import OptimizerLRSchedulerConfig
-import torch.nn.functional as F
-from tqdm import tqdm
 
 
 class CancerFoundation(pl.LightningModule):
@@ -96,16 +97,26 @@ class CancerFoundation(pl.LightningModule):
             scheduler_factor (float): The factor for the StepLR scheduler.
             compile_model (bool): If True, compile the model using `torch.compile`.
             data_path (Union[str, os.PathLike]): The path to the data.
-            loss_type (LossType, optional): The type of loss function to use. Defaults to LossType.MSE.
-            conditions (Optional[List[str]], optional): A list of conditional variables. Defaults to None.
-            conditions_nums (Optional[Any], optional): A dictionary mapping condition names to their number of categories. Defaults to None.
-            mvc_decoder_style (str, optional): The architecture style for the MVC decoder. Defaults to "inner product".
-            scale_zero_expression (Optional[float], optional): A factor to scale the loss for zero-expression values. Defaults to None.
-            do_dat (bool, optional): If True, enable Domain Adversarial Training. Defaults to False.
-            explicit_zero_prob (Optional[bool], optional): If True, explicitly model zero probability. Defaults to False.
-            balance_primary (Optional[str], optional): The primary variable for balanced sampling. Defaults to None.
-            balance_secondary (Optional[str], optional): The secondary variable for balanced sampling. Defaults to None.
-            zero_percentages (Optional[List[float]], optional): Percentages for balancing zero expression. Defaults to None.
+            loss_type (LossType, optional): The type of loss function.
+                Defaults to LossType.MSE.
+            conditions (Optional[List[str]], optional): A list of
+                conditional variables. Defaults to None.
+            conditions_nums (Optional[Any], optional): A dict mapping
+                condition names to category counts. Defaults to None.
+            mvc_decoder_style (str, optional): Architecture style for
+                the MVC decoder. Defaults to "inner product".
+            scale_zero_expression (Optional[float], optional): Factor
+                to scale zero-expression loss. Defaults to None.
+            do_dat (bool, optional): If True, enable Domain
+                Adversarial Training. Defaults to False.
+            explicit_zero_prob (Optional[bool], optional): If True,
+                explicitly model zero probability. Defaults to False.
+            balance_primary (Optional[str], optional): Primary
+                variable for balanced sampling. Defaults to None.
+            balance_secondary (Optional[str], optional): Secondary
+                variable for balanced sampling. Defaults to None.
+            zero_percentages (Optional[List[float]], optional):
+                Percentages for zero expression. Defaults to None.
         """
         super().__init__()
         self.save_hyperparameters()
@@ -115,9 +126,7 @@ class CancerFoundation(pl.LightningModule):
         self.input_emb_style = input_emb_style
         self.max_seq_len = max_seq_len
         self.input_style = input_style
-        self.mask_ratio = (
-            [0.25, 0.50, 0.75] if training_tasks in ["gen", "both"] else mask_ratio
-        )
+        self.mask_ratio = [0.25, 0.50, 0.75] if training_tasks in ["gen", "both"] else mask_ratio
         self.TRUNC_BY_SAMPLE = TRUNC_BY_SAMPLE
         self.training_tasks = training_tasks
         self.embsize = embsize
@@ -145,9 +154,7 @@ class CancerFoundation(pl.LightningModule):
         self.pad_token = "<pad>"
         self.cls_token = "<cls>"
         self.do_mvc = do_mvc
-        self.USE_GENERATIVE_TRAINING = (
-            True if self.training_tasks in ["gen", "both"] else False
-        )
+        self.USE_GENERATIVE_TRAINING = True if self.training_tasks in ["gen", "both"] else False
         self.use_cell_embedding = False
         self.domain_nums = None
         self.explicit_zero_prob = explicit_zero_prob
@@ -183,6 +190,24 @@ class CancerFoundation(pl.LightningModule):
 
         self.pad_token_id = self.vocab["<pad>"]
         self.cls_token_id = self.vocab["<cls>"]
+
+        # Running expression statistics (saved to checkpoint)
+        self._expr_stats = {
+            "raw": {
+                "sum": 0.0,
+                "sum_sq": 0.0,
+                "count": 0,
+                "min": float("inf"),
+                "max": float("-inf"),
+            },
+            "binned": {
+                "sum": 0.0,
+                "sum_sq": 0.0,
+                "count": 0,
+                "min": float("inf"),
+                "max": float("-inf"),
+            },
+        }
 
         # Initialize dataset and model
         self._setup_model(mvc_decoder_style)
@@ -269,8 +294,9 @@ class CancerFoundation(pl.LightningModule):
 
         Args:
             data_dict (dict): A dictionary of input tensors.
-            use_cell_embedding (Optional[bool], optional): A flag to control a specific training behavior.
-                If None, uses the module's default. Defaults to None.
+            use_cell_embedding (Optional[bool], optional): Flag to
+                control training behavior. If None, uses the
+                module's default. Defaults to None.
 
         Returns:
             dict: The output dictionary from the model, typically containing losses.
@@ -289,10 +315,48 @@ class CancerFoundation(pl.LightningModule):
         Returns:
             torch.Tensor: The total loss for the batch.
         """
+        # Accumulate expression statistics and print on first batch of each epoch
+        expr = batch.get("expr", batch.get("pcpt_expr"))
+        mask = expr != self.pad_value
+        vals = expr[mask].float()
+
+        # Update running post-binning stats
+        bs = self._expr_stats["binned"]
+        bs["sum"] += vals.sum().item()
+        bs["sum_sq"] += (vals * vals).sum().item()
+        bs["count"] += vals.numel()
+        bs["min"] = min(bs["min"], vals.min().item())
+        bs["max"] = max(bs["max"], vals.max().item())
+
+        # Update running pre-binning stats
+        if "raw_expr_stats" in batch:
+            s = batch["raw_expr_stats"]
+            rs = self._expr_stats["raw"]
+            rs["sum"] += s["sum"]
+            rs["sum_sq"] += s["sum_sq"]
+            rs["count"] += s["count"]
+            rs["min"] = min(rs["min"], s["min"])
+            rs["max"] = max(rs["max"], s["max"])
+
+        if batch_idx == 0:
+            if "raw_expr_stats" in batch:
+                s = batch["raw_expr_stats"]
+                raw_mean = s["sum"] / s["count"]
+                raw_std = (s["sum_sq"] / s["count"] - raw_mean**2) ** 0.5
+                print(
+                    f"[Epoch {self.current_epoch}] raw expressions (pre-binning): "
+                    f"mean={raw_mean:.3f}, std={raw_std:.3f}, "
+                    f"min={s['min']:.3f}, max={s['max']:.3f}"
+                )
+            print(
+                f"[Epoch {self.current_epoch}] batch expressions (post-binning): "
+                f"mean={vals.mean():.3f}, std={vals.std():.3f}, "
+                f"min={vals.min():.3f}, max={vals.max():.3f}, "
+                f"shape={expr.shape}"
+            )
+
         # Update use_cell_embedding based on global step
-        self.use_cell_embedding = (
-            self.USE_GENERATIVE_TRAINING and self.global_step > 1000
-        )
+        self.use_cell_embedding = self.USE_GENERATIVE_TRAINING and self.global_step > 1000
 
         loss_dict = self.forward(batch, use_cell_embedding=self.use_cell_embedding)
 
@@ -315,7 +379,8 @@ class CancerFoundation(pl.LightningModule):
 
         if batch_idx == 0:
             print(
-                f"Rank {self.trainer.global_rank}: Starting validation with {len(self.trainer.val_dataloaders)} batches"
+                f"Rank {self.trainer.global_rank}: Starting validation "
+                f"with {len(self.trainer.val_dataloaders)} batches"
             )
         loss_dict = self.forward(batch, use_cell_embedding=True)
 
@@ -332,11 +397,38 @@ class CancerFoundation(pl.LightningModule):
 
         return loss_dict
 
+    def on_save_checkpoint(self, checkpoint):
+        """Save running expression statistics to checkpoint."""
+        checkpoint["expr_stats"] = self._expr_stats
+
+    def on_load_checkpoint(self, checkpoint):
+        """Restore running expression statistics from checkpoint."""
+        if "expr_stats" in checkpoint:
+            self._expr_stats = checkpoint["expr_stats"]
+
+    @property
+    def expr_stats_summary(self):
+        """Compute mean/std from running stats. Useful for distribution shift detection."""
+        summary = {}
+        for key in ("raw", "binned"):
+            s = self._expr_stats[key]
+            if s["count"] > 0:
+                mean = s["sum"] / s["count"]
+                std = (s["sum_sq"] / s["count"] - mean**2) ** 0.5
+                summary[key] = {
+                    "mean": mean,
+                    "std": std,
+                    "min": s["min"],
+                    "max": s["max"],
+                    "count": s["count"],
+                }
+        return summary
+
     def configure_optimizers(self) -> OptimizerLRSchedulerConfig:
         """Configures the optimizer and learning rate scheduler.
 
-        Uses an Adam optimizer. If warmup is specified, it uses a cosine learning rate schedule with warmup.
-            Otherwise, it uses a step-based decay scheduler.
+        Uses an Adam optimizer. If warmup is specified, uses a cosine
+        LR schedule with warmup. Otherwise, uses step-based decay.
 
         Returns:
             dict: The optimizer and scheduler configuration for PyTorch Lightning.
@@ -403,9 +495,9 @@ class CancerFoundation(pl.LightningModule):
             with safe_open(pretrained_model_path, framework="pt", device="cpu") as f:
                 for k in f.keys():
                     tensors[k] = f.get_tensor(k)
-        elif pretrained_model_path.name.endswith(
-            ".pth"
-        ) or pretrained_model_path.name.endswith(".pt"):
+        elif pretrained_model_path.name.endswith(".pth") or pretrained_model_path.name.endswith(
+            ".pt"
+        ):
             tensors = torch.load(pretrained_model_path, map_location="cpu")
         else:
             raise ValueError("Unsupported file format. Use .safetensors, .pth, or .pt")
@@ -457,13 +549,9 @@ class CancerFoundation(pl.LightningModule):
         # Embed in batches
         n_batches = (len(data) + batch_size - 1) // batch_size
         embeddings = []
-        for i in tqdm(
-            range(0, len(data), batch_size), total=n_batches, desc="Embedding cells"
-        ):
+        for i in tqdm(range(0, len(data), batch_size), total=n_batches, desc="Embedding cells"):
             batch_expr = torch.FloatTensor(count_matrix[i : i + batch_size]).to(device)
-            batch_genes = (
-                gene_ids.unsqueeze(0).expand(batch_expr.shape[0], -1).to(device)
-            )
+            batch_genes = gene_ids.unsqueeze(0).expand(batch_expr.shape[0], -1).to(device)
 
             # Prepend CLS token
             batch_genes = torch.cat(
@@ -491,9 +579,7 @@ class CancerFoundation(pl.LightningModule):
                 dim=1,
             )
 
-            padding_mask = torch.zeros(
-                batch_genes.shape, dtype=torch.bool, device=device
-            )
+            padding_mask = torch.zeros(batch_genes.shape, dtype=torch.bool, device=device)
 
             if self.model.use_generative_training:
                 # Returns (pcpt_output, gen_output) tuple

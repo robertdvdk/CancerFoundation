@@ -1,16 +1,17 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, "./")
 
-from cancerfoundation.data.dataset import DatasetDir
-from argparse import ArgumentParser
-from bionemo.scdl.io.single_cell_collection import SingleCellCollection
-
-import scanpy as sc
-import pandas as pd
 import json
 import os
+from argparse import ArgumentParser
+
+import pandas as pd
+import scanpy as sc
+from bionemo.scdl.io.single_cell_collection import SingleCellCollection
+
+from cancerfoundation.data.dataset import DatasetDir
 
 GENE_ID = "_cf_gene_id"
 CLS_TOKEN = "<cls>"
@@ -26,9 +27,7 @@ def get_args():
     return parser.parse_args()
 
 
-def _generate_vocab_from_h5ads(
-    h5ads: Path, cls_token: str, pad_token: str
-) -> dict[str, int]:
+def _generate_vocab_from_h5ads(h5ads: Path, cls_token: str, pad_token: str) -> dict[str, int]:
     genes = set()
     for path in h5ads.iterdir():
         if not path.name.endswith(".h5ad"):
@@ -198,10 +197,24 @@ def main():
     # Flatten and create memmap dataset
     memmaps.flatten(data_path.memmap_path, destroy_on_copy=True)
 
-    print("Conversion completed successfully.")
+    # Verify and fix metadata row count (bionemo flatten bug)
+    from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
 
-    # Remove duplicate metadata file that causes issues
-    os.remove(data_path.memmap_path / "features/dataframe_00.parquet")
+    mm = SingleCellMemMapDataset(data_path.memmap_path)
+    actual_rows = mm.number_of_rows()
+    expected_rows = len(obs)
+    if actual_rows != expected_rows:
+        print(f"WARNING: memmap has {actual_rows} rows, " f"expected {expected_rows} from obs")
+    with open(data_path.memmap_path / "metadata.json", "w") as f:
+        json.dump({"num_rows": actual_rows}, f)
+    print(f"Memmap created with {actual_rows} rows.")
+
+    # Remove duplicate metadata file that causes issues (may not exist)
+    dup_parquet = data_path.memmap_path / "features/dataframe_00.parquet"
+    if dup_parquet.exists():
+        os.remove(dup_parquet)
+
+    print("Conversion completed successfully.")
 
 
 if __name__ == "__main__":

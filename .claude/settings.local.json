@@ -18,7 +18,9 @@
       "Bash(chmod +x:*)",
       "Bash(ruff check:*)",
       "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff check:*)",
-      "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff format:*)"
+      "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff format:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)"
     ]
   }
 }
