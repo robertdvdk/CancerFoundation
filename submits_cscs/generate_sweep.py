@@ -31,7 +31,7 @@ from pathlib import Path
 
 OUT_DIR = Path("submits_cscs/sweep")
 ENV_FILE = "./bionemo_bristen.toml"
-TRAIN_DIR = "/iopsstor/scratch/cscs/rvander/DATA/cancer_gpt/"
+TRAIN_DIR = "/capstor/scratch/cscs/rvander/DATA/cancer_gpt/"
 WANDB_PROJECT = "sweep"
 GPUS = 4
 CPUS_PER_TASK = 32
@@ -145,6 +145,7 @@ set -x
 ulimit -c 0
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
+mkdir -p "$SAVE_DIR"
 TRAIN_DIR="@@TRAIN_DIR@@"
 
 srun -ul --environment=@@ENV@@ bash -c "
