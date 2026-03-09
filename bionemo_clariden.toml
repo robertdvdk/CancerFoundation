@@ -1,4 +1,4 @@
-image = "/iopsstor/scratch/cscs/rvander/ce-images/bionemo_clariden.sqsh"
+image = "/users/rvander/capstor_scratch/ce-images/bionemo_clariden.sqsh"
 
 mounts = [
 	"/capstor",
