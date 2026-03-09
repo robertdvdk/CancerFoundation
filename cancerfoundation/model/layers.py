@@ -1,11 +1,12 @@
+from functools import lru_cache, partial
 from typing import Optional, Tuple
+
 import torch
-from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 from torch.nn.modules.transformer import _get_clones
-from functools import partial, lru_cache
 
 
 class MHA(nn.Module):
@@ -32,9 +33,7 @@ class MHA(nn.Module):
         self.causal = causal
 
         self.num_heads = num_heads
-        assert (
-            self.embed_dim % num_heads == 0
-        ), "self.kdim must be divisible by num_heads"
+        assert self.embed_dim % num_heads == 0, "self.kdim must be divisible by num_heads"
         self.head_dim = self.embed_dim // num_heads
         assert (
             self.head_dim % 8 == 0 and self.head_dim <= 128
@@ -59,8 +58,10 @@ class MHA(nn.Module):
         """
         pcpt_total_embs: (batch, pcpt_len, hidden_dim) (where hidden_dim = num heads * head dim)
         gen_total_embs: (batch, gen_len, hidden_dim)
-        pcpt_key_padding_mask: bool tensor of shape (batch, pcpt_len), 1 means valid and 0 means not valid.
-        gen_key_padding_mask: bool tensor of shape (batch, gen_len), 1 means valid and 0 means not valid.
+        pcpt_key_padding_mask: bool tensor of shape (batch, pcpt_len),
+            1 means valid and 0 means not valid.
+        gen_key_padding_mask: bool tensor of shape (batch, gen_len),
+            1 means valid and 0 means not valid.
         """
 
         assert not need_weights
@@ -81,14 +82,12 @@ class MHA(nn.Module):
             )
         if gen_key_padding_mask is None:
             gen_key_padding_mask = (
-                torch.zeros(gen_total_embs.shape[0], gen_seq_len)
-                .bool()
-                .to(pcpt_total_embs.device)
+                torch.zeros(gen_total_embs.shape[0], gen_seq_len).bool().to(pcpt_total_embs.device)
             )
 
-        key_padding_mask = torch.cat(
-            [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
-        ).to(pcpt_total_embs.device)
+        key_padding_mask = torch.cat([pcpt_key_padding_mask, gen_key_padding_mask], dim=1).to(
+            pcpt_total_embs.device
+        )
 
         @lru_cache(maxsize=1)
         def make_mask(len, gen_len, device):
@@ -339,9 +338,7 @@ class CFGenerator(nn.Module):
 
         if pcpt_key_padding_mask is not None:
             _skpm_dtype = pcpt_key_padding_mask.dtype
-            if _skpm_dtype != torch.bool and not torch.is_floating_point(
-                pcpt_key_padding_mask
-            ):
+            if _skpm_dtype != torch.bool and not torch.is_floating_point(pcpt_key_padding_mask):
                 raise AssertionError(
                     "only bool and floating types of key_padding_mask are supported"
                 )
@@ -456,6 +453,15 @@ class RefactoredCFGenerator(nn.Module):
         # --- Pre-processing Step ---
         pcpt_seq_len = pcpt_total_embs.shape[1]
 
+        # Embedding-only path: no generative tokens
+        if gen_total_embs is None:
+            output = self.transformer_encoder(
+                src=pcpt_total_embs,
+                src_key_padding_mask=src_key_padding_mask,
+                is_causal=False,
+            )
+            return output, None
+
         # 1. Concatenate inputs
         src = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
 
@@ -496,9 +502,7 @@ def biological_mask_mod(b, h, q_idx, kv_idx, pcpt_len):
 
 
 class FlexTransformerLayer(nn.Module):
-    def __init__(
-        self, d_model, nhead, dim_feedforward, dropout, activation, norm_first
-    ):
+    def __init__(self, d_model, nhead, dim_feedforward, dropout, activation, norm_first):
         super().__init__()
         self.norm_first = norm_first
         self.nhead = nhead
@@ -598,8 +602,11 @@ class QuickCFGenerator(nn.Module):
     ) -> Tuple[Tensor, Optional[Tensor]]:
         pcpt_len = pcpt_total_embs.shape[1]
 
-        # 1. Concatenate inputs
-        src = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
+        # 1. Concatenate inputs (or just perceptive if no gen tokens)
+        if gen_total_embs is None:
+            src = pcpt_total_embs
+        else:
+            src = torch.cat((pcpt_total_embs, gen_total_embs), dim=1)
         B, total_len, _ = src.shape
 
         # 2. Create the Block Mask (The Efficient "Virtual" Mask)
@@ -622,6 +629,6 @@ class QuickCFGenerator(nn.Module):
 
         # 4. Split output
         pcpt_output = x[:, :pcpt_len]
-        gen_output = x[:, pcpt_len:]
+        gen_output = x[:, pcpt_len:] if gen_total_embs is not None else None
 
         return pcpt_output, gen_output

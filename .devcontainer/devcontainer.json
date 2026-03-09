@@ -2,7 +2,10 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
 {
 	"name": "cancerfoundation",
-	"image": "nvcr.io/nvidia/clara/bionemo-framework:2.7",
+	"build": {
+		"context": "..",
+		"dockerfile": "../Dockerfile"
+	},
 	"runArgs": [
     "--gpus",
     "all",
@@ -19,7 +22,7 @@
     ],
 
 	// Allow for tmux usage in the container, to run long training runs
-	"postCreateCommand": "apt-get update && apt-get install -y tmux && pip install pre-commit && pre-commit install && pip install hickle",
+	"postCreateCommand": "uv pip install --system --no-deps -e . && pre-commit install",
 
 
 	// Configure tool-specific properties.

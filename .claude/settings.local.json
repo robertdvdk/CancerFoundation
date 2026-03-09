@@ -4,7 +4,21 @@
       "WebSearch",
       "Bash(ls:*)",
       "Bash(git log:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(pip list:*)",
+      "Bash(dpkg:*)",
+      "Bash(docker info:*)",
+      "Bash(docker run:*)",
+      "Bash(pip show:*)",
+      "Bash(docker pull:*)",
+      "Bash(chmod +x:*)",
+      "Bash(ruff check:*)",
+      "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff check:*)",
+      "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff format:*)"
     ]
   }
 }

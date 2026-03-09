@@ -2,10 +2,12 @@ import argparse
 import sys
 
 sys.path.insert(0, "../")
-from cancerfoundation.loss import LossType
-from pathlib import Path
-from pytorch_lightning.callbacks import TQDMProgressBar
 from enum import Enum
+from pathlib import Path
+
+from pytorch_lightning.callbacks import TQDMProgressBar
+
+from cancerfoundation.loss import LossType
 
 
 class Precision(str, Enum):
@@ -78,7 +80,9 @@ def get_args():
         "--loss",
         type=LossType,
         default=LossType.MSE,
-        help="The loss function used for the gene expression prediction. Default is ordinal_cross_entropy (Ordinal Cross Entropy).",
+        help="The loss function used for the gene expression "
+        "prediction. Default is ordinal_cross_entropy "
+        "(Ordinal Cross Entropy).",
     )
     parser.add_argument(
         "--input-style",
@@ -197,8 +201,7 @@ def get_args():
         "--d-hid",
         type=int,
         default=64,
-        help="dimension of the feedforward network model in the transformer. "
-        "Default is 64.",
+        help="dimension of the feedforward network model in the transformer. Default is 64.",
     )
     parser.add_argument(
         "--dropout",
@@ -228,7 +231,9 @@ def get_args():
         "--scale-zero-expression",
         type=float,
         default=None,
-        help="How much weight should be placed on predicting if gene expression is above 0. If None, equal weighting is used.",
+        help="How much weight should be placed on predicting "
+        "if gene expression is above 0. If None, equal "
+        "weighting is used.",
     )
     parser.add_argument(
         "--mvc-decoder-style",
@@ -236,9 +241,7 @@ def get_args():
         default="inner product",
         choices=["concat query", "inner product"],
     )
-    parser.add_argument(
-        "--train-path", type=str, default=None, help="Path to the training data."
-    )
+    parser.add_argument("--train-path", type=str, default=None, help="Path to the training data.")
     parser.add_argument(
         "--do-dat",
         action="store_true",
@@ -253,13 +256,15 @@ def get_args():
     parser.add_argument(
         "--balance-primary",
         type=str,
-        help="According to which metadata (primary) one should oversample to make the data more balanced.",
+        help="According to which metadata (primary) one should "
+        "oversample to make the data more balanced.",
         default=None,
     )
     parser.add_argument(
         "--balance-secondary",
         type=str,
-        help="According to which metadata (secondary) one should oversample to make the data more balanced.",
+        help="According to which metadata (secondary) one "
+        "should oversample to make the data more balanced.",
         default=None,
     )
     parser.add_argument(
@@ -318,7 +323,8 @@ def get_args():
     parser.add_argument(
         "--do-mvc",
         action="store_true",
-        help="Whether to predict all gene expression levels from just the class embedding during pre-training.",
+        help="Whether to predict all gene expression levels "
+        "from just the class embedding during pre-training.",
     )
 
     parser.add_argument(
@@ -344,12 +350,11 @@ def get_args():
     parser.add_argument(
         "--explicit-zero-prob",
         action="store_true",
-        help="Whether to explicitly model the probability of a gene being zero-inflated. Default is False.",
+        help="Whether to explicitly model the probability "
+        "of a gene being zero-inflated. Default is False.",
     )
 
-    parser.add_argument(
-        "--log-interval", type=int, default=5, help="Log every n steps."
-    )
+    parser.add_argument("--log-interval", type=int, default=5, help="Log every n steps.")
 
     parser.add_argument(
         "--normalise-bins",
@@ -398,6 +403,19 @@ def get_args():
         "--num-workers",
         type=int,
         help="How many workers to use for the DataLoader.",
+    )
+
+    parser.add_argument(
+        "--eval-every-n-epochs",
+        type=int,
+        default=None,
+        help="Run scib-metrics evaluation every N epochs. If None, disabled.",
+    )
+    parser.add_argument(
+        "--eval-dataset",
+        type=str,
+        default="DATA/neftel_ss2.h5ad",
+        help="Path to the external h5ad dataset for scib-metrics evaluation.",
     )
     return parser.parse_args()
 

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cancerfoundation"
+version = "0.1.0"
+description = "Transformer foundation model for single-cell RNA-seq gene expression prediction"
+requires-python = ">=3.10"
+# Only declare deps that are NOT already in the bionemo base image.
+# torch, lightning, scanpy, anndata, numpy, pandas, etc. come from the base.
+dependencies = [
+    "hickle",
+    "wandb",
+    "scib-metrics",
+    "numpy<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

@@ -6,7 +6,7 @@ python pretrain.py \
     --nheads 8 \
     --embsize 128 \
     --d-hid 256 \
-    --epochs 2 \
+    --epochs 50 \
     --lr 0.0001 \
     --warmup-ratio-or-step 1 \
     --trunc-by-sample \
@@ -27,4 +27,7 @@ python pretrain.py \
     --batch-size 64 \
     --precision "bf16-mixed" \
     --gen-method "quick" \
-    --compile
+    --compile \
+    --wandb "brain" \
+    --eval-every-n-epochs 1 \
+    --eval-dataset DATA/neftel_ss2.h5ad

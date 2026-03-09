@@ -41,3 +41,5 @@ training_data/.cache
 training_data/data
 training_data/downloads
 drug_response_prediction/data
+
+.devcontainer/devcontainer.env

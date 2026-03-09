@@ -4,12 +4,18 @@ import sys
 from typing import Optional
 
 sys.path.insert(0, "../")
-from utils import get_args, MyProgressBar
-from cancerfoundation.model.model import CancerFoundation
-from cancerfoundation.data.data_module import SingleCellDataModule
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+
+from cancerfoundation.callbacks import (
+    CellTypeProbeCallback,
+    MeanBaselineCallback,
+    ScibMetricsCallback,
+)
+from cancerfoundation.data.data_module import SingleCellDataModule
+from cancerfoundation.model.model import CancerFoundation
+from utils import MyProgressBar, get_args
 
 
 def train_model(
@@ -30,6 +36,7 @@ def train_model(
     val_check_interval: float,
     log_interval: int,
     save_every: bool,
+    extra_callbacks: Optional[list] = None,
 ):
     """
     Train the model using PyTorch Lightning Trainer
@@ -66,6 +73,9 @@ def train_model(
     lr_monitor = LearningRateMonitor(logging_interval="step")
     callbacks.append(lr_monitor)
 
+    if extra_callbacks:
+        callbacks.extend(extra_callbacks)
+
     logger = None
 
     # logger = None
@@ -96,6 +106,9 @@ def train_model(
         enable_model_summary=True,
         use_distributed_sampler=False,
     )
+
+    # Run validation before training to get epoch-0 baseline
+    trainer.validate(model, datamodule=datamodule)
 
     # Start training
     trainer.fit(model, datamodule=datamodule, ckpt_path=resume_from_checkpoint)
@@ -183,8 +196,36 @@ def main():
         for key, value in datamodule.vocab.items():
             if key in vocab_pretrained:
                 gene_mapping[value] = vocab_pretrained[key]
-        model.load_pretrained_weights(
-            args.pretrained / "best_model.pt", gene_mapping=gene_mapping
+        model.load_pretrained_weights(args.pretrained / "best_model.pt", gene_mapping=gene_mapping)
+
+    # Setup extra callbacks
+    extra_callbacks = []
+
+    # Mean baseline callback
+    n_genes = len(datamodule.vocab)
+    extra_callbacks.append(
+        MeanBaselineCallback(
+            n_genes=n_genes,
+            pad_value=model.pad_value,
+            mask_value=model.mask_value,
+        )
+    )
+
+    # ScibMetrics callback
+    if args.eval_every_n_epochs is not None:
+        extra_callbacks.append(
+            ScibMetricsCallback(
+                eval_every_n_epochs=args.eval_every_n_epochs,
+                neftel_path=args.eval_dataset,
+                max_seq_len=args.max_seq_len,
+                seed=args.seed,
+            )
+        )
+        extra_callbacks.append(
+            CellTypeProbeCallback(
+                eval_every_n_epochs=args.eval_every_n_epochs,
+                seed=args.seed,
+            )
         )
 
     train_model(
@@ -205,6 +246,7 @@ def main():
         gradient_clip_val=args.gradient_clip_val,
         log_interval=args.log_interval,
         save_every=args.save_every,
+        extra_callbacks=extra_callbacks,
     )
 
 
