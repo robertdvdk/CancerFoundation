@@ -6,7 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --account=a132
 
-srun -ul --environment=./bionemo_clariden.toml python -c "
+TOML=${TOML:-./bionemo_bristen.toml}
+srun -ul --environment=$TOML python -c "
 import anndata as ad
 import numpy as np
 
