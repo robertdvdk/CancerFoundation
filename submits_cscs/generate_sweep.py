@@ -136,7 +136,6 @@ TEMPLATE = r"""#!/bin/bash -l
 #SBATCH --partition=normal
 #SBATCH --ntasks-per-node=@@GPUS@@
 #SBATCH --gres=gpu:@@GPUS@@
-#SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=@@CPUS@@
 #SBATCH --account=@@ACCOUNT@@
 

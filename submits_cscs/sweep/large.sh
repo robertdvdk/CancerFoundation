@@ -5,7 +5,6 @@
 #SBATCH --partition=normal
 #SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
-#SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
