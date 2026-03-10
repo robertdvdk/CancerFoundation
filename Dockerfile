@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/clara/bionemo-framework:2.7
+FROM nvcr.io/nvidia/clara/bionemo-framework:2.7.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends tmux \
     && rm -rf /var/lib/apt/lists/*

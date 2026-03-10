@@ -1,16 +1,12 @@
-from typing import Optional
-from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
-from torch.utils.data import Dataset
-import torch
-
-
 import json
-
 from pathlib import Path
-import pandas as pd
+from typing import Optional
 
 import numpy as np
-
+import pandas as pd
+import torch
+from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
+from torch.utils.data import Dataset
 
 # TODO: Move from_h5ads to its own script!
 
@@ -93,8 +89,8 @@ class SingleCellDataset(Dataset):
         return self.memmap.number_of_rows()
 
     def __getitem__(self, index: int) -> dict[str, int | torch.Tensor]:
-        exp, genes = self.memmap.get_row_padded(
-            index, return_features=True, feature_vars=[self.GENE_ID]
+        exp, genes, _ = self.memmap.get_row_padded(
+            index, return_var_features=True, var_feature_names=[self.GENE_ID]
         )
 
         genes = np.insert(genes[0], 0, self.vocab["<cls>"])
