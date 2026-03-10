@@ -19,7 +19,7 @@ Additional axes to consider:
     - Mask ratio:   {"mask_ratio": 0.15}  or  {"mask_ratio": 0.6}
     - Dropout:      {"dropout": 0.1}
     - Batch size:   {"batch_size": 64, "lr": 0.0004}  (linear LR scaling)
-    - Evaluation:   {"eval_every_n_epochs": 5, "eval_dataset": "DATA/neftel_ss2.h5ad"}
+    - Evaluation:   {"eval_every_n_epochs": 5}
 """
 
 import stat
@@ -70,7 +70,11 @@ BASELINE = {
     "do_mvc": True,
     "their_init_weights": True,
     "eval_every_n_epochs": 5,
-    "eval_dataset": "/capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad",
+    "eval_datasets": [
+        "/capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad",
+        "/capstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad",
+        "/capstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad",
+    ],
 }
 
 # ============================================================

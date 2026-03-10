@@ -412,10 +412,11 @@ def get_args():
         help="Run scib-metrics evaluation every N epochs. If None, disabled.",
     )
     parser.add_argument(
-        "--eval-dataset",
+        "--eval-datasets",
+        nargs="+",
         type=str,
-        default="DATA/neftel_ss2.h5ad",
-        help="Path to the external h5ad dataset for scib-metrics evaluation.",
+        default=["DATA/neftel_ss2.h5ad", "DATA/ji_skin.h5ad", "DATA/kim_lung.h5ad"],
+        help="Paths to external h5ad datasets for scib-metrics evaluation.",
     )
     return parser.parse_args()
 

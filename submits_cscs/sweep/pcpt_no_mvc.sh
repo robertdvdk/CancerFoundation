@@ -54,7 +54,7 @@ srun -ul --environment=./bionemo_bristen.toml bash -c "
     --input-emb-style theirs \
     --their-init-weights \
     --eval-every-n-epochs 5 \
-    --eval-dataset /capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad
+    --eval-datasets /capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad
 "
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then

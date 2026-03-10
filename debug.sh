@@ -30,4 +30,4 @@ python pretrain.py \
     --compile \
     --wandb "brain" \
     --eval-every-n-epochs 5 \
-    --eval-dataset DATA/neftel_ss2.h5ad
+    --eval-datasets DATA/neftel_ss2.h5ad DATA/ji_skin.h5ad DATA/kim_lung.h5ad

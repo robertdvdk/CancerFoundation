@@ -239,12 +239,19 @@ class CellTypeProbeCallback(Callback):
         self._evaluate(trainer, pl_module, epoch=epoch)
 
 
+EVAL_DATASET_KEYS = {
+    "neftel_ss2": {"batch_key": "sample", "label_key": "subtype"},
+    "ji_skin": {"batch_key": "sample", "label_key": "celltype"},
+    "kim_lung": {"batch_key": "sample", "label_key": "celltype"},
+}
+
+
 class ScibMetricsCallback(Callback):
     """Periodically evaluates batch correction and bio conservation metrics
     using scib-metrics on:
       1. The validation set embeddings
-      2. An external dataset (neftel_ss2.h5ad) with HVG-based gene selection
-      3. The same external dataset with random gene selection
+      2. External datasets with HVG-based gene selection
+      3. The same external datasets with random gene selection
 
     UMAPs and metric tables are logged to wandb.
     """
@@ -252,50 +259,61 @@ class ScibMetricsCallback(Callback):
     def __init__(
         self,
         eval_every_n_epochs: int,
-        neftel_path: str,
+        dataset_paths: list[str],
         max_seq_len: int,
         val_batch_key: str = "technology",
         val_label_key: str = "cancer_type",
-        neftel_batch_key: str = "sample",
-        neftel_label_key: str = "subtype",
         seed: Optional[int] = 42,
     ):
         super().__init__()
         self.eval_every_n_epochs = eval_every_n_epochs
-        self.neftel_path = neftel_path
         self.max_seq_len = max_seq_len
         self.val_batch_key = val_batch_key
         self.val_label_key = val_label_key
-        self.neftel_batch_key = neftel_batch_key
-        self.neftel_label_key = neftel_label_key
         self.seed = seed
-        self._neftel_adata = None
-        self._random_gene_indices = None
 
-    def _load_neftel(self):
-        """Load the neftel dataset once and cache it."""
-        if self._neftel_adata is not None:
+        from pathlib import Path
+
+        self.datasets = []
+        for p in dataset_paths:
+            stem = Path(p).stem
+            keys = EVAL_DATASET_KEYS.get(stem, {"batch_key": "sample", "label_key": "celltype"})
+            self.datasets.append(
+                {
+                    "name": stem,
+                    "path": p,
+                    "batch_key": keys["batch_key"],
+                    "label_key": keys["label_key"],
+                    "_adata": None,
+                    "_random_gene_indices": None,
+                    "_random_common_genes": None,
+                }
+            )
+
+    def _load_dataset(self, ds):
+        """Load a dataset once and cache it."""
+        if ds["_adata"] is not None:
             return
         import anndata as ad
 
-        self._neftel_adata = ad.read_h5ad(self.neftel_path)
-        if hasattr(self._neftel_adata.X, "toarray"):
-            self._neftel_adata.X = self._neftel_adata.X.toarray()
+        ds["_adata"] = ad.read_h5ad(ds["path"])
+        if hasattr(ds["_adata"].X, "toarray"):
+            ds["_adata"].X = ds["_adata"].X.toarray()
 
-    def _get_random_gene_indices(self, model):
+    def _get_random_gene_indices(self, model, ds):
         """Get a fixed random subset of gene indices (intersection with vocab)."""
-        if self._random_gene_indices is not None:
-            return self._random_gene_indices
-        self._load_neftel()
+        if ds["_random_gene_indices"] is not None:
+            return ds["_random_gene_indices"]
+        self._load_dataset(ds)
         vocab = model.vocab
-        common_genes = [g for g in self._neftel_adata.var_names if g in vocab]
+        common_genes = [g for g in ds["_adata"].var_names if g in vocab]
         rng = np.random.RandomState(self.seed)
         n_select = min(self.max_seq_len, len(common_genes))
-        self._random_gene_indices = sorted(
+        ds["_random_gene_indices"] = sorted(
             rng.choice(len(common_genes), size=n_select, replace=False).tolist()
         )
-        self._random_common_genes = [common_genes[i] for i in self._random_gene_indices]
-        return self._random_gene_indices
+        ds["_random_common_genes"] = [common_genes[i] for i in ds["_random_gene_indices"]]
+        return ds["_random_gene_indices"]
 
     def _embed_with_genes(self, model, adata, gene_list):
         """Embed an AnnData using a specific list of genes (subset of vocab)."""
@@ -586,65 +604,67 @@ class ScibMetricsCallback(Callback):
 
             traceback.print_exc()
 
-        # --- 2. Neftel with HVG gene selection ---
-        try:
-            self._load_neftel()
-            neftel = self._neftel_adata.copy()
-            vocab = pl_module.vocab
-            common_genes = [g for g in neftel.var_names if g in vocab]
-            neftel_common = neftel[:, common_genes].copy()
+        # --- 2 & 3. External datasets with HVG and random gene selection ---
+        for ds in self.datasets:
+            name = ds["name"]
 
-            sc.pp.highly_variable_genes(
-                neftel_common, n_top_genes=min(self.max_seq_len, len(common_genes))
-            )
-            hvg_genes = neftel_common.var_names[neftel_common.var["highly_variable"]].tolist()
+            # HVG evaluation
+            try:
+                self._load_dataset(ds)
+                adata = ds["_adata"].copy()
+                vocab = pl_module.vocab
+                common_genes = [g for g in adata.var_names if g in vocab]
+                adata_common = adata[:, common_genes].copy()
 
-            emb_hvg = self._embed_with_genes(pl_module, neftel, hvg_genes)
-            neftel_hvg_adata = ad.AnnData(X=emb_hvg, obs=neftel.obs.copy().reset_index(drop=True))
-            neftel_hvg_adata.obsm["X_emb"] = emb_hvg
+                sc.pp.highly_variable_genes(
+                    adata_common, n_top_genes=min(self.max_seq_len, len(common_genes))
+                )
+                hvg_genes = adata_common.var_names[adata_common.var["highly_variable"]].tolist()
 
-            self._run_scib_and_log(
-                neftel_hvg_adata,
-                batch_key=self.neftel_batch_key,
-                label_key=self.neftel_label_key,
-                embedding_key="X_emb",
-                prefix="scib/neftel_hvg",
-                trainer=trainer,
-                epoch=epoch,
-            )
-        except Exception as e:
-            print(f"[ScibMetrics] Neftel HVG evaluation failed: {e}")
-            import traceback
+                emb_hvg = self._embed_with_genes(pl_module, adata, hvg_genes)
+                hvg_adata = ad.AnnData(X=emb_hvg, obs=adata.obs.copy().reset_index(drop=True))
+                hvg_adata.obsm["X_emb"] = emb_hvg
 
-            traceback.print_exc()
+                self._run_scib_and_log(
+                    hvg_adata,
+                    batch_key=ds["batch_key"],
+                    label_key=ds["label_key"],
+                    embedding_key="X_emb",
+                    prefix=f"scib/{name}_hvg",
+                    trainer=trainer,
+                    epoch=epoch,
+                )
+            except Exception as e:
+                print(f"[ScibMetrics] {name} HVG evaluation failed: {e}")
+                import traceback
 
-        # --- 3. Neftel with random gene selection ---
-        try:
-            self._load_neftel()
-            neftel = self._neftel_adata.copy()
-            self._get_random_gene_indices(pl_module)
-            random_genes = self._random_common_genes
+                traceback.print_exc()
 
-            emb_random = self._embed_with_genes(pl_module, neftel, random_genes)
-            neftel_rnd_adata = ad.AnnData(
-                X=emb_random, obs=neftel.obs.copy().reset_index(drop=True)
-            )
-            neftel_rnd_adata.obsm["X_emb"] = emb_random
+            # Random gene evaluation
+            try:
+                self._load_dataset(ds)
+                adata = ds["_adata"].copy()
+                self._get_random_gene_indices(pl_module, ds)
+                random_genes = ds["_random_common_genes"]
 
-            self._run_scib_and_log(
-                neftel_rnd_adata,
-                batch_key=self.neftel_batch_key,
-                label_key=self.neftel_label_key,
-                embedding_key="X_emb",
-                prefix="scib/neftel_random",
-                trainer=trainer,
-                epoch=epoch,
-            )
-        except Exception as e:
-            print(f"[ScibMetrics] Neftel random evaluation failed: {e}")
-            import traceback
+                emb_random = self._embed_with_genes(pl_module, adata, random_genes)
+                rnd_adata = ad.AnnData(X=emb_random, obs=adata.obs.copy().reset_index(drop=True))
+                rnd_adata.obsm["X_emb"] = emb_random
 
-            traceback.print_exc()
+                self._run_scib_and_log(
+                    rnd_adata,
+                    batch_key=ds["batch_key"],
+                    label_key=ds["label_key"],
+                    embedding_key="X_emb",
+                    prefix=f"scib/{name}_random",
+                    trainer=trainer,
+                    epoch=epoch,
+                )
+            except Exception as e:
+                print(f"[ScibMetrics] {name} random evaluation failed: {e}")
+                import traceback
+
+                traceback.print_exc()
 
         print(f"[ScibMetrics] Evaluation at epoch {epoch} complete.")
 

@@ -87,6 +87,13 @@ def train_model(
             name=wandb_name,
             save_dir=save_dir,
         )
+        # Set epoch as x-axis for all evaluation metrics
+        import wandb
+
+        _ = logger.experiment  # ensure wandb.init() has been called
+        wandb.define_metric("val/*", step_metric="epoch")
+        wandb.define_metric("scib/*", step_metric="epoch")
+        wandb.define_metric("celltype_probe/*", step_metric="epoch")
 
     # Create trainer
     trainer = pl.Trainer(
@@ -214,7 +221,7 @@ def main():
         extra_callbacks.append(
             ScibMetricsCallback(
                 eval_every_n_epochs=args.eval_every_n_epochs,
-                neftel_path=args.eval_dataset,
+                dataset_paths=args.eval_datasets,
                 max_seq_len=args.max_seq_len,
                 seed=args.seed,
             )
