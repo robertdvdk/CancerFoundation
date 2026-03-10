@@ -229,6 +229,8 @@ class CellTypeProbeCallback(Callback):
         self._evaluate(trainer, pl_module, epoch=-1)
 
     def on_validation_epoch_end(self, trainer, pl_module):
+        if trainer.sanity_checking:
+            return
         if trainer.global_rank != 0:
             return
         epoch = trainer.current_epoch
@@ -655,6 +657,8 @@ class ScibMetricsCallback(Callback):
         self._evaluate(trainer, pl_module, epoch=-1)
 
     def on_validation_epoch_end(self, trainer, pl_module):
+        if trainer.sanity_checking:
+            return
         # Only run on rank 0
         if trainer.global_rank != 0:
             return
