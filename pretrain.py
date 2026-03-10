@@ -107,10 +107,8 @@ def train_model(
         use_distributed_sampler=False,
     )
 
-    # Run validation before training to get epoch-0 baseline
-    trainer.validate(model, datamodule=datamodule)
-
-    # Start training
+    # Start training (pre-training baseline validation runs via on_fit_start
+    # inside fit(), which is DDP-safe unlike a standalone trainer.validate())
     trainer.fit(model, datamodule=datamodule, ckpt_path=resume_from_checkpoint)
 
     return trainer
