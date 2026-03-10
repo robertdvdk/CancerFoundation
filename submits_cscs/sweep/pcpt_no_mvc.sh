@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=sweep_gen_theirs
+#SBATCH --job-name=sweep_pcpt_no_mvc
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=06:00:00
 #SBATCH --partition=normal
@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
-# scGPT-style generation
+# Perception only, no MVC
 
 set -x
 ulimit -c 0
@@ -27,22 +27,20 @@ srun -ul --environment=./bionemo_bristen.toml bash -c "
     --gpus 4 \
     --save-dir \"$SAVE_DIR\" \
     --train-path \"$TRAIN_DIR\" \
-    --wandb \"sweep\" \
+    --wandb \"brain\" \
     --wandb-name \"${SLURM_JOB_NAME}_${SLURM_JOB_ID}\" \
     --max-seq-len 1200 \
-    --batch-size 32 \
+    --batch-size 64 \
     --nlayers 6 \
     --nheads 8 \
-    --embsize 256 \
-    --d-hid 512 \
-    --epochs 15 \
-    --lr 0.0002 \
-    --warmup-ratio-or-step 5000 \
-    --val-check-interval 1.0 \
+    --embsize 128 \
+    --d-hid 256 \
+    --epochs 50 \
+    --lr 0.0001 \
+    --warmup-ratio-or-step 1 \
     --trunc-by-sample \
     --loss mse \
-    --balance-primary tissue \
-    --balance-secondary technology \
+    --balance-primary technology \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy ddp \
     --seed 0 \
@@ -52,10 +50,11 @@ srun -ul --environment=./bionemo_bristen.toml bash -c "
     --conditions technology \
     --where-condition end \
     --num-workers 8 \
-    --training-tasks both \
-    --gen-method theirs \
+    --training-tasks pcpt \
     --input-emb-style theirs \
-    --do-mvc
+    --their-init-weights \
+    --eval-every-n-epochs 5 \
+    --eval-dataset /capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad
 "
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then

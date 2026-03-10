@@ -29,5 +29,5 @@ python pretrain.py \
     --gen-method "quick" \
     --compile \
     --wandb "brain" \
-    --eval-every-n-epochs 1 \
+    --eval-every-n-epochs 5 \
     --eval-dataset DATA/neftel_ss2.h5ad
