@@ -168,15 +168,7 @@ class CellTypeProbeCallback(Callback):
             random_state=self.seed,
         )
 
-    def on_validation_epoch_end(self, trainer, pl_module):
-        if trainer.global_rank != 0:
-            return
-        epoch = trainer.current_epoch
-        if epoch % self.eval_every_n_epochs != 0:
-            return
-        if trainer.logger is None:
-            return
-
+    def _evaluate(self, trainer, pl_module, epoch):
         from sklearn.linear_model import LogisticRegression
         from sklearn.metrics import accuracy_score, f1_score
 
@@ -199,24 +191,28 @@ class CellTypeProbeCallback(Callback):
             acc = accuracy_score(y_test, y_pred)
             f1_macro = f1_score(y_test, y_pred, average="macro")
 
-            pl_module.log(
-                "celltype_probe/accuracy", acc, on_epoch=True, prog_bar=True, sync_dist=True
-            )
-            pl_module.log("celltype_probe/f1_macro", f1_macro, on_epoch=True, sync_dist=True)
+            if trainer.logger is not None:
+                trainer.logger.experiment.log(
+                    {
+                        "celltype_probe/accuracy": acc,
+                        "celltype_probe/f1_macro": f1_macro,
+                        "epoch": epoch,
+                    }
+                )
 
-            # Log per-class F1 to wandb
-            try:
-                classes = sorted(set(y_test))
-                per_class_f1 = f1_score(y_test, y_pred, labels=classes, average=None)
-                for cls, f1 in zip(classes, per_class_f1):
-                    trainer.logger.experiment.log(
-                        {
-                            f"celltype_probe/f1_{cls}": f1,
-                            "epoch": epoch,
-                        }
-                    )
-            except Exception:
-                pass
+                # Log per-class F1 to wandb
+                try:
+                    classes = sorted(set(y_test))
+                    per_class_f1 = f1_score(y_test, y_pred, labels=classes, average=None)
+                    for cls, f1 in zip(classes, per_class_f1):
+                        trainer.logger.experiment.log(
+                            {
+                                f"celltype_probe/f1_{cls}": f1,
+                                "epoch": epoch,
+                            }
+                        )
+                except Exception:
+                    pass
 
             print(f"[CellTypeProbe] epoch {epoch}: acc={acc:.3f}, macro-F1={f1_macro:.3f}")
 
@@ -225,6 +221,20 @@ class CellTypeProbeCallback(Callback):
             import traceback
 
             traceback.print_exc()
+
+    def on_train_start(self, trainer, pl_module):
+        """Pre-training baseline evaluation (runs inside fit, DDP-safe)."""
+        if trainer.global_rank != 0:
+            return
+        self._evaluate(trainer, pl_module, epoch=-1)
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if trainer.global_rank != 0:
+            return
+        epoch = trainer.current_epoch
+        if epoch % self.eval_every_n_epochs != 0:
+            return
+        self._evaluate(trainer, pl_module, epoch=epoch)
 
 
 class ScibMetricsCallback(Callback):
@@ -448,7 +458,9 @@ class ScibMetricsCallback(Callback):
         emb_matrix = np.concatenate(embeddings, axis=0)
         return emb_matrix, obs_df
 
-    def _run_scib_and_log(self, adata, batch_key, label_key, embedding_key, prefix, trainer):
+    def _run_scib_and_log(
+        self, adata, batch_key, label_key, embedding_key, prefix, trainer, epoch=None
+    ):
         """Run scib-metrics Benchmarker and log results + UMAP to wandb."""
         import matplotlib
         import scanpy as sc
@@ -462,6 +474,8 @@ class ScibMetricsCallback(Callback):
             print("scib-metrics not installed, skipping ScibMetrics evaluation.")
             return
 
+        if epoch is None:
+            epoch = trainer.current_epoch
         logger = trainer.logger
         if logger is None:
             return
@@ -494,7 +508,7 @@ class ScibMetricsCallback(Callback):
                 logger.experiment.log(
                     {
                         f"{prefix}/umap": wandb.Image(fig),
-                        "epoch": trainer.current_epoch,
+                        "epoch": epoch,
                     }
                 )
             except Exception as e:
@@ -518,7 +532,7 @@ class ScibMetricsCallback(Callback):
             import wandb
 
             summary_keys = {"Total", "Bio conservation", "Batch correction"}
-            print(f"[ScibMetrics] {prefix} results (epoch {trainer.current_epoch}):")
+            print(f"[ScibMetrics] {prefix} results (epoch {epoch}):")
             for col in results.columns:
                 if col == "Embedding":
                     continue
@@ -533,7 +547,7 @@ class ScibMetricsCallback(Callback):
                         logger.experiment.log(
                             {
                                 f"{prefix}/{col}": val,
-                                "epoch": trainer.current_epoch,
+                                "epoch": epoch,
                             }
                         )
 
@@ -543,17 +557,7 @@ class ScibMetricsCallback(Callback):
 
             traceback.print_exc()
 
-    def on_validation_epoch_end(self, trainer, pl_module):
-        # Only run on rank 0
-        if trainer.global_rank != 0:
-            return
-        # Only run every n epochs (and also at epoch 0 for pre-training baseline)
-        epoch = trainer.current_epoch
-        if epoch % self.eval_every_n_epochs != 0:
-            return
-        if trainer.logger is None:
-            return
-
+    def _evaluate(self, trainer, pl_module, epoch):
         import anndata as ad
         import scanpy as sc
 
@@ -572,6 +576,7 @@ class ScibMetricsCallback(Callback):
                 embedding_key="X_emb",
                 prefix="scib/val",
                 trainer=trainer,
+                epoch=epoch,
             )
         except Exception as e:
             print(f"[ScibMetrics] Validation set evaluation failed: {e}")
@@ -603,6 +608,7 @@ class ScibMetricsCallback(Callback):
                 embedding_key="X_emb",
                 prefix="scib/neftel_hvg",
                 trainer=trainer,
+                epoch=epoch,
             )
         except Exception as e:
             print(f"[ScibMetrics] Neftel HVG evaluation failed: {e}")
@@ -630,6 +636,7 @@ class ScibMetricsCallback(Callback):
                 embedding_key="X_emb",
                 prefix="scib/neftel_random",
                 trainer=trainer,
+                epoch=epoch,
             )
         except Exception as e:
             print(f"[ScibMetrics] Neftel random evaluation failed: {e}")
@@ -638,3 +645,23 @@ class ScibMetricsCallback(Callback):
             traceback.print_exc()
 
         print(f"[ScibMetrics] Evaluation at epoch {epoch} complete.")
+
+    def on_train_start(self, trainer, pl_module):
+        """Pre-training baseline evaluation (runs inside fit, DDP-safe)."""
+        if trainer.global_rank != 0:
+            return
+        if trainer.logger is None:
+            return
+        self._evaluate(trainer, pl_module, epoch=-1)
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        # Only run on rank 0
+        if trainer.global_rank != 0:
+            return
+        # Only run every n epochs (and also at epoch 0 for pre-training baseline)
+        epoch = trainer.current_epoch
+        if epoch % self.eval_every_n_epochs != 0:
+            return
+        if trainer.logger is None:
+            return
+        self._evaluate(trainer, pl_module, epoch=epoch)

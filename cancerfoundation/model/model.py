@@ -305,14 +305,6 @@ class CancerFoundation(pl.LightningModule):
             use_cell_embedding = self.use_cell_embedding
         return self.model(data_dict, use_cell_embedding=use_cell_embedding)
 
-    def on_fit_start(self):
-        """Run one validation epoch before training begins (pre-training baseline).
-
-        This runs inside trainer.fit() after DDP is initialized, avoiding the
-        subprocess-collision bug that a standalone trainer.validate() causes.
-        """
-        self.trainer.validate(self, self.trainer.datamodule)
-
     def training_step(self, batch, batch_idx):
         """Performs a single training step.
 
