@@ -24,7 +24,8 @@
       "WebFetch(domain:docs.nvidia.com)",
       "Bash(npm install:*)",
       "Bash(devcontainer --version)",
-      "Bash(devcontainer exec:*)"
+      "Bash(devcontainer exec:*)",
+      "Bash(find /local/home/rvander/CancerFoundation -type f -name \"*image*\" -o -name \"*container*\" 2>/dev/null | head -20)"
     ]
   }
 }

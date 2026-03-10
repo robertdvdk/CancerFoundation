@@ -118,7 +118,6 @@ mkdir -p "$SAVE_DIR"
 TRAIN_DIR="@@TRAIN_DIR@@"
 
 srun -ul --environment=@@ENV@@ bash -c "
-    pip install -q scib-metrics && \
     MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \
     MASTER_PORT=29500 \
     RANK=\${SLURM_PROCID} \
