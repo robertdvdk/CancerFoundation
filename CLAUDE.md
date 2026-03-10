@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Execution Environment
+
+**All commands MUST be run inside the devcontainer.** This project depends on CUDA, BioNeMo, and Python packages that are only available inside the Docker container.
+
+To run any shell command, use:
+```bash
+devcontainer exec --workspace-folder /local/home/rvander/CancerFoundation <command>
+```
+
+If the container is not running, start it first:
+```bash
+devcontainer up --workspace-folder /local/home/rvander/CancerFoundation
+```
+
+This applies to **everything**: training, linting, tests, pip/uv installs, Python scripts, and any other shell commands. Never run project commands directly on the host.
+
 ## Project Overview
 
 CancerFoundation is a PyTorch Lightning-based Transformer foundation model for single-cell RNA-seq gene expression prediction. It supports masked language modeling (MLM) and generative pretraining tasks on single-cell data. Large parts of the codebase are based on [scGPT](https://github.com/bowang-lab/scGPT).

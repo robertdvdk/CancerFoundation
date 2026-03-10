@@ -20,7 +20,11 @@
       "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff check:*)",
       "Bash(/local/home/rvander/.cache/uv/archive-v0/zMxgemSS44ExSNwOEcAfe/ruff-0.14.5.data/scripts/ruff format:*)",
       "Bash(docker ps:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "WebFetch(domain:docs.nvidia.com)",
+      "Bash(npm install:*)",
+      "Bash(devcontainer --version)",
+      "Bash(devcontainer exec:*)"
     ]
   }
 }

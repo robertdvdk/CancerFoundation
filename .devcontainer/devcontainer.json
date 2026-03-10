@@ -6,6 +6,20 @@
 		"context": "..",
 		"dockerfile": "../Dockerfile"
 	},
+
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"username": "vscode",
+			"installZsh": false,
+			"configureZshAsDefaultShell": false,
+			"installOhMyZsh": false,
+			"upgradePackages": false
+		}
+	},
+
+	"updateRemoteUserUID": true,
+	"remoteUser": "vscode",
+
 	"runArgs": [
     "--gpus",
     "all",
@@ -17,12 +31,12 @@
 
 	// Git integration
     "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached",
-		"source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind"
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind"
     ],
 
 	// Allow for tmux usage in the container, to run long training runs
-	"postCreateCommand": "uv pip install --system --no-deps -e . && pre-commit install",
+	"postCreateCommand": "sudo uv pip install --system --no-deps -e . && pre-commit install",
 
 
 	// Configure tool-specific properties.
