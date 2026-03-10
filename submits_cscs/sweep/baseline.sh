@@ -18,6 +18,7 @@ mkdir -p "$SAVE_DIR"
 TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
 
 srun -ul --environment=./bionemo_bristen.toml bash -c "
+    pip install -q scib-metrics && \
     MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \
     MASTER_PORT=29500 \
     RANK=\${SLURM_PROCID} \
