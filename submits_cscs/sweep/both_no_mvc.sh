@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
-# Both tasks, no MVC
+# Both tasks, no MVC, binned
 
 set -x
 ulimit -c 0

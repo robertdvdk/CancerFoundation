@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=sweep_baseline
+#SBATCH --job-name=sweep_both_no_mvc_unbinned
 #SBATCH --output=./%x_%j.out
 #SBATCH --time=06:00:00
 #SBATCH --partition=normal
@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
-# Both tasks + MVC, binned
+# Both tasks, no MVC, unbinned
 
 set -x
 ulimit -c 0
@@ -53,10 +53,10 @@ srun -ul --environment=./bionemo_bristen.toml bash -c "
     --training-tasks both \
     --gen-method quick \
     --input-emb-style theirs \
-    --do-mvc \
     --their-init-weights \
     --eval-every-n-epochs 5 \
-    --eval-datasets /capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad
+    --eval-datasets /capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad \
+    --input-style log1p
 "
 
 if [ -d "./lightning_logs/version_${SLURM_JOB_ID}" ]; then

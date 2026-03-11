@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --account=a132
 
-# Perception only + MVC
+# Perception only + MVC, binned
 
 set -x
 ulimit -c 0
