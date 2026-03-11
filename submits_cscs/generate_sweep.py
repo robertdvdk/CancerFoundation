@@ -31,7 +31,7 @@ from pathlib import Path
 
 OUT_DIR = Path("submits_cscs/sweep")
 ENV_FILE = "./bionemo_bristen.toml"
-TRAIN_DIR = "/capstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
+TRAIN_DIR = "/iopsstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
 WANDB_PROJECT = "brain"
 GPUS = 4
 CPUS_PER_TASK = 32
@@ -71,9 +71,9 @@ BASELINE = {
     "their_init_weights": True,
     "eval_every_n_epochs": 5,
     "eval_datasets": [
-        "/capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad",
-        "/capstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad",
-        "/capstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad",
+        "/iopsstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad",
+        "/iopsstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad",
+        "/iopsstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad",
     ],
 }
 

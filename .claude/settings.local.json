@@ -28,7 +28,8 @@
       "Bash(find /local/home/rvander/CancerFoundation -type f -name \"*image*\" -o -name \"*container*\" 2>/dev/null | head -20)",
       "Bash(find /local/home/rvander/CancerFoundation -name \"*.h5ad\" 2>/dev/null | head -20)",
       "Bash(grep -r \"print\\(\" /local/home/rvander/CancerFoundation/cancerfoundation/model/*.py | head -20)",
-      "Bash(find /local/home/rvander/CancerFoundation/save -name \"*.log\" -o -name \"stdout.txt\" 2>/dev/null | head -5)"
+      "Bash(find /local/home/rvander/CancerFoundation/save -name \"*.log\" -o -name \"stdout.txt\" 2>/dev/null | head -5)",
+      "Bash(find /local/home/rvander/CancerFoundation -type f \\\\\\( -name \"*.sh\" -o -name \"*.py\" -o -name \"*.toml\" -o -name \"*.json\" -o -name \"*.yaml\" -o -name \"*.yml\" -o -name \"*.md\" -o -name \"*.ipynb\" \\\\\\) 2>/dev/null | head -50)"
     ]
   }
 }

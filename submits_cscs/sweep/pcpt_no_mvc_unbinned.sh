@@ -15,7 +15,7 @@ ulimit -c 0
 
 SAVE_DIR="./save/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 mkdir -p "$SAVE_DIR"
-TRAIN_DIR="/capstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
+TRAIN_DIR="/iopsstor/scratch/cscs/rvander/DATA/brain_processed/processed_data/train"
 
 srun -ul --environment=./bionemo_bristen.toml bash -c "
     MASTER_ADDR=\$(scontrol show hostnames \$SLURM_JOB_NODELIST | head -n 1) \
@@ -54,7 +54,7 @@ srun -ul --environment=./bionemo_bristen.toml bash -c "
     --input-emb-style theirs \
     --their-init-weights \
     --eval-every-n-epochs 5 \
-    --eval-datasets /capstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad /capstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad \
+    --eval-datasets /iopsstor/scratch/cscs/rvander/DATA/brain_processed/neftel_ss2.h5ad /iopsstor/scratch/cscs/rvander/DATA/brain_processed/ji_skin.h5ad /iopsstor/scratch/cscs/rvander/DATA/brain_processed/kim_lung.h5ad \
     --input-style log1p
 "
 
