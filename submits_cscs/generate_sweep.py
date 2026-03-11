@@ -63,7 +63,7 @@ BASELINE = {
     "log_interval": 100,
     "conditions": "technology",
     "where_condition": "end",
-    "num_workers": 8,
+    "num_workers": 24,
     "training_tasks": "both",
     "gen_method": "quick",
     "input_emb_style": "theirs",

@@ -22,19 +22,12 @@ class MeanBaselineCallback(Callback):
 
     def _is_valid_expr(self, expr_vals):
         """Identify positions with real expression values (not pad/mask/CLS)."""
-        # pad_value is -2 for continuous, n_bins for category
-        # mask_value is -1 for continuous, n_bins+1 for category
-        # Real expression values are always >= 0
+        # pad_value=-2, mask_value=-1; real expression values are always >= 0
         return expr_vals >= 0
 
     def _is_masked(self, masked_expr):
         """Identify positions that were masked by the collator."""
-        if self.mask_value < 0:
-            # Continuous: mask_value is -1, pad_value is -2
-            return (masked_expr > self.pad_value + 0.5) & (masked_expr < 0)
-        else:
-            # Category: mask_value is n_bins+1
-            return masked_expr == self.mask_value
+        return masked_expr == self.mask_value
 
     def _accumulate_from_batch(self, batch):
         """Accumulate gene expression sums/counts from a training batch."""
@@ -511,13 +504,21 @@ class ScibMetricsCallback(Callback):
             fig, axes = plt.subplots(1, 2, figsize=(16, 6))
             if has_batch:
                 sc.pl.umap(
-                    adata, color=batch_key, ax=axes[0], show=False, title=f"{prefix} - batch"
+                    adata,
+                    color=batch_key,
+                    ax=axes[0],
+                    show=False,
+                    title=f"{prefix} - batch (epoch {epoch})",
                 )
             else:
                 axes[0].set_visible(False)
             if has_label:
                 sc.pl.umap(
-                    adata, color=label_key, ax=axes[1], show=False, title=f"{prefix} - label"
+                    adata,
+                    color=label_key,
+                    ax=axes[1],
+                    show=False,
+                    title=f"{prefix} - label (epoch {epoch})",
                 )
             else:
                 axes[1].set_visible(False)

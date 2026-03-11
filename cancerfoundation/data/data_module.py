@@ -1,13 +1,20 @@
-import pytorch_lightning as pl
-from typing import Optional, Dict
-from typing import Iterator
 from operator import itemgetter
-from .data_sampler import get_balanced_sampler
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, random_split
+from typing import Dict, Iterator, Optional
+
+import pytorch_lightning as pl
+from torch.utils.data import (
+    DataLoader,
+    Dataset,
+    DistributedSampler,
+    RandomSampler,
+    Sampler,
+    SequentialSampler,
+    random_split,
+)
 
 from .data_collator import AnnDataCollator
+from .data_sampler import get_balanced_sampler
 from .dataset import SingleCellDataset
-from torch.utils.data import Dataset, Sampler, DistributedSampler
 
 
 class DatasetFromSampler(Dataset):
@@ -86,15 +93,9 @@ class SingleCellDataModule(pl.LightningDataModule):
         self.condition_token = condition_token
         self.num_workers = num_workers
 
-        # Setup token values based on embedding style
-        if self.input_style == "category":
-            self.mask_value = self.n_bins + 1
-            self.pad_value = self.n_bins  # for padding gene expr values
-            self.n_input_bins = self.n_bins + 2
-        else:
-            self.mask_value = -1
-            self.pad_value = -2
-            self.n_input_bins = self.n_bins
+        self.mask_value = -1
+        self.pad_value = -2
+        self.n_input_bins = self.n_bins
 
     def setup(self, stage: str):
         """Initialize dataset and create train/validation splits"""
@@ -110,9 +111,7 @@ class SingleCellDataModule(pl.LightningDataModule):
                 self.conditions_nums[cond] = len(self.dataset.mapping[cond].keys())
 
         # Create train/validation split
-        self.train_dataset, self.val_dataset = random_split(
-            self.dataset, [1 - 0.05, 0.05]
-        )
+        self.train_dataset, self.val_dataset = random_split(self.dataset, [1 - 0.05, 0.05])
         self.vocab = self.dataset.vocab
 
         self.pad_token_id = self.vocab["<pad>"]

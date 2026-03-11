@@ -178,15 +178,9 @@ class CancerFoundation(pl.LightningModule):
         self.zero_percentages = zero_percentages
         self.scale_zero_expression = scale_zero_expression
 
-        # Setup token values based on embedding style
-        if self.input_emb_style == "category":
-            self.mask_value = self.n_bins + 1
-            self.pad_value = self.n_bins  # for padding gene expr values
-            self.n_input_bins = self.n_bins + 2
-        else:
-            self.mask_value = -1
-            self.pad_value = -2
-            self.n_input_bins = self.n_bins
+        self.mask_value = -1
+        self.pad_value = -2
+        self.n_input_bins = self.n_bins
 
         self.pad_token_id = self.vocab["<pad>"]
         self.cls_token_id = self.vocab["<cls>"]

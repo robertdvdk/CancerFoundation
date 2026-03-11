@@ -26,7 +26,8 @@
       "Bash(devcontainer --version)",
       "Bash(devcontainer exec:*)",
       "Bash(find /local/home/rvander/CancerFoundation -type f -name \"*image*\" -o -name \"*container*\" 2>/dev/null | head -20)",
-      "Bash(find /local/home/rvander/CancerFoundation -name \"*.h5ad\" 2>/dev/null | head -20)"
+      "Bash(find /local/home/rvander/CancerFoundation -name \"*.h5ad\" 2>/dev/null | head -20)",
+      "Bash(grep -r \"print\\(\" /local/home/rvander/CancerFoundation/cancerfoundation/model/*.py | head -20)"
     ]
   }
 }

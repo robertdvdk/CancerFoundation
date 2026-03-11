@@ -1,7 +1,8 @@
 # in perturbation_model.py
-import torch
-from torch import nn, Tensor
 from typing import Dict
+
+import torch
+from torch import Tensor, nn
 
 # Make sure to import your base model correctly
 from .module import TransformerModule
@@ -21,7 +22,8 @@ class PerturbationTransformer(TransformerModule):
 
         if self.conditions is not None:
             print(
-                "Support for conditions is not yet implemented, but this model has been pretrained with conditions. Performance may suffer!"
+                "Support for conditions is not yet implemented, but this model has been "
+                "pretrained with conditions. Performance may suffer!"
             )
 
     def _encode_perturbation(
@@ -31,10 +33,7 @@ class PerturbationTransformer(TransformerModule):
         src_key_padding_mask: Tensor,
         pert_flags: Tensor,
     ) -> Tensor:
-        if self.gen_method == "orig":
-            src_embs = self.encoder(src)
-        else:
-            src_embs = self.gene_encoder(src)
+        src_embs = self.gene_encoder(src)
         self.cur_gene_token_embs = src_embs  # For MVC if you use it
         values_embs = self.value_encoder(values)
         pert_embs = self.pert_encoder(pert_flags)
@@ -100,9 +99,7 @@ class PerturbationTransformer(TransformerModule):
         if include_zero_gene == "all":
             input_gene_ids = torch.arange(n_genes, device=device, dtype=torch.long)
         else:  # "batch-wise"
-            input_gene_ids = (
-                ori_gene_values.nonzero()[:, 1].flatten().unique().sort()[0]
-            )
+            input_gene_ids = ori_gene_values.nonzero()[:, 1].flatten().unique().sort()[0]
 
         input_values = ori_gene_values[:, input_gene_ids]
         input_pert_flags = pert_flags[:, input_gene_ids]
@@ -116,9 +113,7 @@ class PerturbationTransformer(TransformerModule):
         mapped_input_gene_ids = vocab_ids[input_gene_ids]
         mapped_input_gene_ids = mapped_input_gene_ids.repeat(batch_size, 1)
 
-        src_key_padding_mask = torch.zeros_like(
-            input_values, dtype=torch.bool, device=device
-        )
+        src_key_padding_mask = torch.zeros_like(input_values, dtype=torch.bool, device=device)
 
         with torch.cuda.amp.autocast(enabled=amp):
             # IMPORTANT: Call your model's forward method here

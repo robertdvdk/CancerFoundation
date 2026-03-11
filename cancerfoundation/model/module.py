@@ -97,6 +97,7 @@ class TransformerModule(nn.Module):
         self.cell_emb_style = cell_emb_style
         self.explicit_zero_prob = explicit_zero_prob
         self.pad_token_id = pad_token_id
+        self.pad_value = pad_value
         self.norm_scheme = "pre" if norm_first else "post"
         self.use_generative_training = use_generative_training
         self.where_condition = where_condition
@@ -164,7 +165,7 @@ class TransformerModule(nn.Module):
                     encoder_layer=encoder_layers, num_layers=nlayers
                 )
                 self.flag_encoder = nn.Embedding(2, d_model)
-                self.encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
+                self.gene_encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
             elif gen_method == "theirs":
                 encoder_layers = CFLayer(
                     d_model,
@@ -268,10 +269,7 @@ class TransformerModule(nn.Module):
         Returns:
             Tensor: The resulting embeddings of shape (batch, seq_len, embsize).
         """
-        if hasattr(self, "gene_encoder"):
-            gene_embs = self.gene_encoder(src)
-        elif hasattr(self, "encoder"):
-            gene_embs = self.encoder(src)
+        gene_embs = self.gene_encoder(src)
         value_embs = self.value_encoder(values)
 
         if conditions is not None and self.where_condition == "begin":
@@ -321,7 +319,7 @@ class TransformerModule(nn.Module):
         """
         self._check_condition_labels(conditions)
 
-        src_embs = self.encoder(src)
+        src_embs = self.gene_encoder(src)
         self.cur_gene_token_embs = src_embs
 
         values = self.value_encoder(values)
@@ -372,10 +370,7 @@ class TransformerModule(nn.Module):
         """
         self._check_condition_labels(conditions)
 
-        if hasattr(self, "gene_encoder"):
-            pcpt_token_embs = self.gene_encoder(pcpt_genes)
-        elif hasattr(self, "encoder"):
-            pcpt_token_embs = self.encoder(pcpt_genes)
+        pcpt_token_embs = self.gene_encoder(pcpt_genes)
         pcpt_values_embs = self.value_encoder(pcpt_values)
         pcpt_total_embs = pcpt_token_embs + pcpt_values_embs
 
@@ -402,10 +397,7 @@ class TransformerModule(nn.Module):
         assert self.input_emb_style != "scaling"
 
         if gen_genes is not None:
-            if hasattr(self, "gene_encoder"):
-                gen_token_embs = self.gene_encoder(gen_genes)
-            elif hasattr(self, "encoder"):
-                gen_token_embs = self.encoder(gen_genes)
+            gen_token_embs = self.gene_encoder(gen_genes)
             self.cur_gene_token_embs = torch.cat([pcpt_token_embs, gen_token_embs], dim=1)
             if hasattr(self, "generative_flag"):
                 gen_flags = self.generative_flag
@@ -626,7 +618,7 @@ class TransformerModule(nn.Module):
             )
 
             output_values = output_dict["mlm_output"]
-            positions_to_match = ~src_key_padding_mask & (target_values != -2)
+            positions_to_match = ~src_key_padding_mask & (target_values != self.pad_value)
             loss = loss_expr = self.criterion(output_values, target_values, positions_to_match)
             loss_dict["loss_expr"] = loss_expr
 
@@ -790,22 +782,18 @@ class TransformerModule(nn.Module):
             )
         transformer_output = self.encode(src, values, src_key_padding_mask, conditions)
 
-        if self.where_condition == "begin":
+        if self.where_condition == "end" and self.conditions:
+            decoder_input = torch.cat(
+                [
+                    condition_emb.view(condition_emb.shape[0], -1)
+                    .unsqueeze(1)
+                    .repeat(1, transformer_output.shape[1], 1),
+                    transformer_output,
+                ],
+                dim=2,
+            )
+        else:
             decoder_input = transformer_output
-
-        elif self.where_condition == "end":
-            if self.conditions:
-                decoder_input = torch.cat(
-                    [
-                        condition_emb.view(condition_emb.shape[0], -1)
-                        .unsqueeze(1)
-                        .repeat(1, transformer_output.shape[1], 1),
-                        transformer_output,
-                    ],
-                    dim=2,
-                )
-            else:
-                decoder_input = transformer_output
 
         output = {}
         mlm_output = self.decoder(decoder_input)

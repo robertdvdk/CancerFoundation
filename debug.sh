@@ -16,18 +16,15 @@ python pretrain.py \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='auto' \
     --seed 0 \
-    --do-mvc \
     --log-interval 50 \
-    --training-tasks "both" \
+    --training-tasks "pcpt" \
     --input-emb-style "theirs" \
-    --conditions technology \
-    --where-condition end \
     --their-init-weights \
     --num-workers 8 \
     --batch-size 64 \
     --precision "bf16-mixed" \
     --gen-method "quick" \
     --compile \
-    --wandb "brain" \
-    --eval-every-n-epochs 5 \
-    --eval-datasets DATA/neftel_ss2.h5ad DATA/ji_skin.h5ad DATA/kim_lung.h5ad
+    --input-style "normed_raw"
+    # --eval-every-n-epochs 5 \
+    # --eval-datasets DATA/neftel_ss2.h5ad DATA/ji_skin.h5ad DATA/kim_lung.h5ad
