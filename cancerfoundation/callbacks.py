@@ -271,6 +271,7 @@ class ScibMetricsCallback(Callback):
         self.val_batch_key = val_batch_key
         self.val_label_key = val_label_key
         self.seed = seed
+        self._val_cache = None  # cached val data to avoid repeated disk I/O
 
         from pathlib import Path
 
@@ -326,11 +327,12 @@ class ScibMetricsCallback(Callback):
         if hasattr(data.X, "toarray"):
             data.X = data.X.toarray()
 
-        normalise = model.model.decoder.normalise_bins
-        for idx in range(data.n_obs):
-            data.X[idx] = binning(data.X[idx], model.n_bins)
-            if normalise:
-                data.X[idx] = data.X[idx] / model.n_bins
+        if model.input_style == "binned":
+            normalise = model.model.decoder.normalise_bins
+            for idx in range(data.n_obs):
+                data.X[idx] = binning(data.X[idx], model.n_bins)
+                if normalise:
+                    data.X[idx] = data.X[idx] / model.n_bins
 
         gene_ids = torch.LongTensor([model.vocab[g] for g in gene_list])
         count_matrix = data.X if isinstance(data.X, np.ndarray) else data.X.toarray()
@@ -392,54 +394,70 @@ class ScibMetricsCallback(Callback):
         """Collect cell embeddings and metadata from the validation set."""
         import time
 
-        from torch.utils.data import DataLoader, Subset
-
         from cancerfoundation.data.preprocess import binning as bin_fn
 
         t0 = time.time()
         pl_module.model.eval()
         device = next(pl_module.model.parameters()).device
 
-        datamodule = trainer.datamodule
-        val_subset = datamodule.val_dataset
-        full_dataset = val_subset.dataset
-        val_indices = [int(i) for i in val_subset.indices]
+        # Load val data from disk once, then reuse the cache
+        if self._val_cache is None:
+            from torch.utils.data import DataLoader, Subset
 
-        # Get metadata for val cells using the reverse mapping
-        obs_df = full_dataset.obs.iloc[val_indices].copy()
-        mapping = full_dataset.mapping
-        for col in [self.val_batch_key, self.val_label_key]:
-            if col in mapping:
-                reverse_map = {int(v): k for k, v in mapping[col].items()}
-                obs_df[col] = obs_df[col].map(reverse_map)
-        print(
-            f"[ScibMetrics]   metadata: {time.time() - t0:.1f}s ({len(val_indices)} cells)",
-            flush=True,
-        )
+            datamodule = trainer.datamodule
+            val_subset = datamodule.val_dataset
+            full_dataset = val_subset.dataset
+            val_indices = [int(i) for i in val_subset.indices]
 
-        # Load val samples with parallel workers
-        t1 = time.time()
-        val_ds = Subset(full_dataset, val_indices)
-        loader = DataLoader(
-            val_ds,
-            batch_size=256,
-            num_workers=4,
-            shuffle=False,
-            collate_fn=lambda batch: batch,  # return list of dicts
-        )
+            # Get metadata for val cells using the reverse mapping
+            obs_df = full_dataset.obs.iloc[val_indices].copy()
+            mapping = full_dataset.mapping
+            for col in [self.val_batch_key, self.val_label_key]:
+                if col in mapping:
+                    reverse_map = {int(v): k for k, v in mapping[col].items()}
+                    obs_df[col] = obs_df[col].map(reverse_map)
+
+            # Load val samples
+            t1 = time.time()
+            val_ds = Subset(full_dataset, val_indices)
+            loader = DataLoader(
+                val_ds,
+                batch_size=256,
+                num_workers=0,
+                shuffle=False,
+                collate_fn=lambda batch: batch,
+            )
+
+            genes_list = []
+            expr_list = []
+            for batch in loader:
+                for item in batch:
+                    genes_list.append(item["genes"])
+                    expr_list.append(item["expressions"])
+
+            self._val_cache = {
+                "genes_list": genes_list,
+                "expr_list": expr_list,
+                "obs_df": obs_df,
+            }
+            n_cells = len(val_indices)
+            print(
+                f"[ScibMetrics]   loaded & cached val data:"
+                f" {time.time() - t1:.1f}s ({n_cells} cells)",
+                flush=True,
+            )
+        else:
+            genes_list = self._val_cache["genes_list"]
+            expr_list = self._val_cache["expr_list"]
+            obs_df = self._val_cache["obs_df"]
+            print(
+                f"[ScibMetrics]   using cached val data ({len(genes_list)} cells)",
+                flush=True,
+            )
 
         normalise = pl_module.model.decoder.normalise_bins
         embeddings = []
         batch_size = 64
-
-        # Collect all samples first (parallelized via DataLoader workers)
-        genes_list = []
-        expr_list = []
-        for batch in loader:
-            for item in batch:
-                genes_list.append(item["genes"])
-                expr_list.append(item["expressions"])
-        print(f"[ScibMetrics]   dataloader: {time.time() - t1:.1f}s", flush=True)
 
         # Pad all to same length, bin, and run inference in batches
         t2 = time.time()
@@ -458,14 +476,15 @@ class ScibMetricsCallback(Callback):
 
         # Bin expression values (per-cell quantile binning)
         t3 = time.time()
-        for j in range(n):
-            valid = ~padding_mask[j] & (padded_expr[j] >= 0)
-            if valid.any():
-                vals = padded_expr[j][valid].numpy()
-                binned = bin_fn(vals, pl_module.n_bins)
-                if normalise:
-                    binned = binned / pl_module.n_bins
-                padded_expr[j][valid] = torch.from_numpy(np.array(binned, dtype=np.float32))
+        if pl_module.input_style == "binned":
+            for j in range(n):
+                valid = ~padding_mask[j] & (padded_expr[j] >= 0)
+                if valid.any():
+                    vals = padded_expr[j][valid].numpy()
+                    binned = bin_fn(vals, pl_module.n_bins)
+                    if normalise:
+                        binned = binned / pl_module.n_bins
+                    padded_expr[j][valid] = torch.from_numpy(np.array(binned, dtype=np.float32))
         print(f"[ScibMetrics]   binning: {time.time() - t3:.1f}s", flush=True)
 
         # Run model inference in batches

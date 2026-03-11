@@ -530,11 +530,12 @@ class CancerFoundation(pl.LightningModule):
         data = data[:, data.var["highly_variable"]].copy()
 
         # Bin expression values
-        normalise = self.model.decoder.normalise_bins
-        for idx in range(data.n_obs):
-            data.X[idx] = binning(data.X[idx], self.n_bins)
-            if normalise:
-                data.X[idx] = data.X[idx] / self.n_bins
+        if self.input_style == "binned":
+            normalise = self.model.decoder.normalise_bins
+            for idx in range(data.n_obs):
+                data.X[idx] = binning(data.X[idx], self.n_bins)
+                if normalise:
+                    data.X[idx] = data.X[idx] / self.n_bins
 
         # Build gene ID tensor
         gene_ids = torch.LongTensor([self.vocab[g] for g in data.var.index])

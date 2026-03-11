@@ -82,18 +82,41 @@ BASELINE = {
 # ============================================================
 
 EXPERIMENTS = [
-    # 2x2 grid: training_tasks (both/pcpt) x do_mvc (True/False)
-    ("baseline", "Both tasks + MVC (default config)", {}),
-    ("both_no_mvc", "Both tasks, no MVC", {"do_mvc": False}),
+    # 2x2x2 grid: training_tasks (both/pcpt) x do_mvc (True/False) x input_style (binned/log1p)
+    # --- binned (default) ---
+    ("baseline", "Both tasks + MVC, binned", {}),
+    ("both_no_mvc", "Both tasks, no MVC, binned", {"do_mvc": False}),
     (
         "pcpt_mvc",
-        "Perception only + MVC",
+        "Perception only + MVC, binned",
         {"training_tasks": "pcpt", "gen_method": None},
     ),
     (
         "pcpt_no_mvc",
-        "Perception only, no MVC",
+        "Perception only, no MVC, binned",
         {"training_tasks": "pcpt", "gen_method": None, "do_mvc": False},
+    ),
+    # --- log1p (no binning) ---
+    ("baseline_unbinned", "Both tasks + MVC, unbinned", {"input_style": "log1p"}),
+    (
+        "both_no_mvc_unbinned",
+        "Both tasks, no MVC, unbinned",
+        {"do_mvc": False, "input_style": "log1p"},
+    ),
+    (
+        "pcpt_mvc_unbinned",
+        "Perception only + MVC, unbinned",
+        {"training_tasks": "pcpt", "gen_method": None, "input_style": "log1p"},
+    ),
+    (
+        "pcpt_no_mvc_unbinned",
+        "Perception only, no MVC, unbinned",
+        {
+            "training_tasks": "pcpt",
+            "gen_method": None,
+            "do_mvc": False,
+            "input_style": "log1p",
+        },
     ),
 ]
 
@@ -226,7 +249,7 @@ def main():
     submit_all.write_text("\n".join(lines) + "\n")
     submit_all.chmod(submit_all.stat().st_mode | stat.S_IEXEC)
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Generated {len(scripts)} scripts + submit_all.sh")
     print(f"  Submit all:  bash {submit_all}")
     print(f"  Submit one:  sbatch {OUT_DIR}/<name>.sh")
