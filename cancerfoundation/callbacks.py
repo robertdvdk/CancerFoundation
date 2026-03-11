@@ -162,16 +162,22 @@ class CellTypeProbeCallback(Callback):
         )
 
     def _evaluate(self, trainer, pl_module, epoch):
+        import time
+
         from sklearn.linear_model import LogisticRegression
         from sklearn.metrics import accuracy_score, f1_score
 
-        print(f"[CellTypeProbe] Running evaluation at epoch {epoch}...")
+        print(f"[CellTypeProbe] Running evaluation at epoch {epoch}...", flush=True)
 
         try:
+            t0 = time.time()
             self._load_data()
+            print(f"[CellTypeProbe] Data loaded in {time.time() - t0:.1f}s", flush=True)
 
             # Embed all cells (2,638 cells — takes ~1s)
+            t0 = time.time()
             emb_df = pl_module.embed(self._adata)
+            print(f"[CellTypeProbe] Embedding done in {time.time() - t0:.1f}s", flush=True)
             X = emb_df.values
 
             X_train, X_test = X[self._train_idx], X[self._test_idx]
@@ -217,9 +223,10 @@ class CellTypeProbeCallback(Callback):
 
     def on_train_start(self, trainer, pl_module):
         """Pre-training baseline evaluation (runs inside fit, DDP-safe)."""
-        if trainer.global_rank != 0:
-            return
-        self._evaluate(trainer, pl_module, epoch=-1)
+        if trainer.global_rank == 0:
+            self._evaluate(trainer, pl_module, epoch=-1)
+        if torch.distributed.is_initialized():
+            torch.distributed.barrier()
 
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.sanity_checking:
@@ -579,14 +586,18 @@ class ScibMetricsCallback(Callback):
             traceback.print_exc()
 
     def _evaluate(self, trainer, pl_module, epoch):
+        import time
+
         import anndata as ad
         import scanpy as sc
 
-        print(f"[ScibMetrics] Running evaluation at epoch {epoch}...")
+        print(f"[ScibMetrics] Running evaluation at epoch {epoch}...", flush=True)
 
         # --- 1. Validation set embeddings ---
         try:
+            t0 = time.time()
             emb_matrix, obs_df = self._get_val_embeddings_and_metadata(trainer, pl_module)
+            print(f"[ScibMetrics] Val embeddings done in {time.time() - t0:.1f}s", flush=True)
             val_adata = ad.AnnData(X=emb_matrix, obs=obs_df.reset_index(drop=True))
             val_adata.obsm["X_emb"] = emb_matrix
 
@@ -608,10 +619,13 @@ class ScibMetricsCallback(Callback):
         # --- 2 & 3. External datasets with HVG and random gene selection ---
         for ds in self.datasets:
             name = ds["name"]
+            print(f"[ScibMetrics] Starting {name}...", flush=True)
 
             # HVG evaluation
             try:
+                t0 = time.time()
                 self._load_dataset(ds)
+                print(f"[ScibMetrics] {name} loaded in {time.time() - t0:.1f}s", flush=True)
                 adata = ds["_adata"].copy()
                 vocab = pl_module.vocab
                 common_genes = [g for g in adata.var_names if g in vocab]
@@ -622,10 +636,16 @@ class ScibMetricsCallback(Callback):
                 )
                 hvg_genes = adata_common.var_names[adata_common.var["highly_variable"]].tolist()
 
+                t0 = time.time()
                 emb_hvg = self._embed_with_genes(pl_module, adata, hvg_genes)
+                print(
+                    f"[ScibMetrics] {name} HVG embedding done in {time.time() - t0:.1f}s",
+                    flush=True,
+                )
                 hvg_adata = ad.AnnData(X=emb_hvg, obs=adata.obs.copy().reset_index(drop=True))
                 hvg_adata.obsm["X_emb"] = emb_hvg
 
+                t0 = time.time()
                 self._run_scib_and_log(
                     hvg_adata,
                     batch_key=ds["batch_key"],
@@ -635,6 +655,7 @@ class ScibMetricsCallback(Callback):
                     trainer=trainer,
                     epoch=epoch,
                 )
+                print(f"[ScibMetrics] {name} HVG scib done in {time.time() - t0:.1f}s", flush=True)
             except Exception as e:
                 print(f"[ScibMetrics] {name} HVG evaluation failed: {e}")
                 import traceback
@@ -648,10 +669,16 @@ class ScibMetricsCallback(Callback):
                 self._get_random_gene_indices(pl_module, ds)
                 random_genes = ds["_random_common_genes"]
 
+                t0 = time.time()
                 emb_random = self._embed_with_genes(pl_module, adata, random_genes)
+                print(
+                    f"[ScibMetrics] {name} random embedding done in {time.time() - t0:.1f}s",
+                    flush=True,
+                )
                 rnd_adata = ad.AnnData(X=emb_random, obs=adata.obs.copy().reset_index(drop=True))
                 rnd_adata.obsm["X_emb"] = emb_random
 
+                t0 = time.time()
                 self._run_scib_and_log(
                     rnd_adata,
                     batch_key=ds["batch_key"],
@@ -661,21 +688,23 @@ class ScibMetricsCallback(Callback):
                     trainer=trainer,
                     epoch=epoch,
                 )
+                print(
+                    f"[ScibMetrics] {name} random scib done in {time.time() - t0:.1f}s", flush=True
+                )
             except Exception as e:
                 print(f"[ScibMetrics] {name} random evaluation failed: {e}")
                 import traceback
 
                 traceback.print_exc()
 
-        print(f"[ScibMetrics] Evaluation at epoch {epoch} complete.")
+        print(f"[ScibMetrics] Evaluation at epoch {epoch} complete.", flush=True)
 
     def on_train_start(self, trainer, pl_module):
         """Pre-training baseline evaluation (runs inside fit, DDP-safe)."""
-        if trainer.global_rank != 0:
-            return
-        if trainer.logger is None:
-            return
-        self._evaluate(trainer, pl_module, epoch=-1)
+        if trainer.global_rank == 0 and trainer.logger is not None:
+            self._evaluate(trainer, pl_module, epoch=-1)
+        if torch.distributed.is_initialized():
+            torch.distributed.barrier()
 
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.sanity_checking:
