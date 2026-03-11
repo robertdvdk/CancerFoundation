@@ -337,7 +337,7 @@ class ScibMetricsCallback(Callback):
 
         embeddings = []
         batch_size = 64
-        for i in range(0, len(data), batch_size):
+        for i in range(0, len(count_matrix), batch_size):
             batch_expr = torch.FloatTensor(count_matrix[i : i + batch_size]).to(device)
             batch_genes = gene_ids.unsqueeze(0).expand(batch_expr.shape[0], -1).to(device)
 
@@ -390,8 +390,13 @@ class ScibMetricsCallback(Callback):
 
     def _get_val_embeddings_and_metadata(self, trainer, pl_module):
         """Collect cell embeddings and metadata from the validation set."""
+        import time
+
+        from torch.utils.data import DataLoader, Subset
+
         from cancerfoundation.data.preprocess import binning as bin_fn
 
+        t0 = time.time()
         pl_module.model.eval()
         device = next(pl_module.model.parameters()).device
 
@@ -403,79 +408,89 @@ class ScibMetricsCallback(Callback):
         # Get metadata for val cells using the reverse mapping
         obs_df = full_dataset.obs.iloc[val_indices].copy()
         mapping = full_dataset.mapping
-
-        # Reverse-map encoded integers back to string labels
         for col in [self.val_batch_key, self.val_label_key]:
             if col in mapping:
                 reverse_map = {int(v): k for k, v in mapping[col].items()}
                 obs_df[col] = obs_df[col].map(reverse_map)
+        print(
+            f"[ScibMetrics]   metadata: {time.time() - t0:.1f}s ({len(val_indices)} cells)",
+            flush=True,
+        )
 
+        # Load val samples with parallel workers
+        t1 = time.time()
+        val_ds = Subset(full_dataset, val_indices)
+        loader = DataLoader(
+            val_ds,
+            batch_size=256,
+            num_workers=4,
+            shuffle=False,
+            collate_fn=lambda batch: batch,  # return list of dicts
+        )
+
+        normalise = pl_module.model.decoder.normalise_bins
         embeddings = []
         batch_size = 64
-        normalise = pl_module.model.decoder.normalise_bins
 
-        for start in range(0, len(val_indices), batch_size):
-            end = min(start + batch_size, len(val_indices))
-            batch_items = [full_dataset[val_indices[j]] for j in range(start, end)]
+        # Collect all samples first (parallelized via DataLoader workers)
+        genes_list = []
+        expr_list = []
+        for batch in loader:
+            for item in batch:
+                genes_list.append(item["genes"])
+                expr_list.append(item["expressions"])
+        print(f"[ScibMetrics]   dataloader: {time.time() - t1:.1f}s", flush=True)
 
-            genes_list = [item["genes"] for item in batch_items]
-            expr_list = [item["expressions"] for item in batch_items]
+        # Pad all to same length, bin, and run inference in batches
+        t2 = time.time()
+        max_len = min(max(g.shape[0] for g in genes_list), self.max_seq_len)
+        n = len(genes_list)
+        padded_genes = torch.full((n, max_len), pl_module.pad_token_id, dtype=torch.long)
+        padded_expr = torch.full((n, max_len), pl_module.pad_value, dtype=torch.float32)
+        padding_mask = torch.ones((n, max_len), dtype=torch.bool)
 
-            # Pad to same length
-            max_len = max(g.shape[0] for g in genes_list)
-            padded_genes = torch.full(
-                (len(genes_list), max_len), pl_module.pad_token_id, dtype=torch.long
-            )
-            padded_expr = torch.full(
-                (len(expr_list), max_len), pl_module.pad_value, dtype=torch.float32
-            )
-            padding_mask = torch.ones((len(genes_list), max_len), dtype=torch.bool)
+        for j, (g, e) in enumerate(zip(genes_list, expr_list)):
+            seq_len = min(g.shape[0], max_len)
+            padded_genes[j, :seq_len] = g[:seq_len]
+            padded_expr[j, :seq_len] = e[:seq_len]
+            padding_mask[j, :seq_len] = False
+        print(f"[ScibMetrics]   padding: {time.time() - t2:.1f}s", flush=True)
 
-            for j, (g, e) in enumerate(zip(genes_list, expr_list)):
-                seq_len = min(g.shape[0], max_len)
-                padded_genes[j, :seq_len] = g[:seq_len]
-                padded_expr[j, :seq_len] = e[:seq_len]
-                padding_mask[j, :seq_len] = False
+        # Bin expression values (per-cell quantile binning)
+        t3 = time.time()
+        for j in range(n):
+            valid = ~padding_mask[j] & (padded_expr[j] >= 0)
+            if valid.any():
+                vals = padded_expr[j][valid].numpy()
+                binned = bin_fn(vals, pl_module.n_bins)
+                if normalise:
+                    binned = binned / pl_module.n_bins
+                padded_expr[j][valid] = torch.from_numpy(np.array(binned, dtype=np.float32))
+        print(f"[ScibMetrics]   binning: {time.time() - t3:.1f}s", flush=True)
 
-            # Bin expression values (skip CLS and padding positions)
-            for j in range(padded_expr.shape[0]):
-                valid = ~padding_mask[j] & (padded_expr[j] >= 0)
-                if valid.any():
-                    vals = padded_expr[j][valid].numpy()
-                    binned = bin_fn(vals, pl_module.n_bins)
-                    if normalise:
-                        binned = binned / pl_module.n_bins
-                    padded_expr[j][valid] = torch.from_numpy(np.array(binned, dtype=np.float32))
-
-            # Truncate to max_seq_len (keep CLS at position 0)
-            if max_len > self.max_seq_len:
-                padded_genes = padded_genes[:, : self.max_seq_len]
-                padded_expr = padded_expr[:, : self.max_seq_len]
-                padding_mask = padding_mask[:, : self.max_seq_len]
-
-            padded_genes = padded_genes.to(device)
-            padded_expr = padded_expr.to(device)
-            padding_mask = padding_mask.to(device)
+        # Run model inference in batches
+        t4 = time.time()
+        for start in range(0, n, batch_size):
+            end = min(start + batch_size, n)
+            bg = padded_genes[start:end].to(device)
+            be = padded_expr[start:end].to(device)
+            bm = padding_mask[start:end].to(device)
 
             with torch.no_grad():
                 if pl_module.model.use_generative_training:
-                    output = pl_module.model.embed(
-                        src=padded_genes,
-                        values=padded_expr,
-                        src_key_padding_mask=padding_mask,
-                    )
+                    output = pl_module.model.embed(src=bg, values=be, src_key_padding_mask=bm)
                     transformer_output = output[0]
                 else:
                     transformer_output = pl_module.model.encode(
-                        src=padded_genes,
-                        values=padded_expr,
-                        src_key_padding_mask=padding_mask,
+                        src=bg, values=be, src_key_padding_mask=bm
                     )
 
             cell_emb = transformer_output[:, 0, :]
             embeddings.append(cell_emb.cpu().numpy())
+        print(f"[ScibMetrics]   inference: {time.time() - t4:.1f}s", flush=True)
 
         emb_matrix = np.concatenate(embeddings, axis=0)
+        print(f"[ScibMetrics]   total: {time.time() - t0:.1f}s", flush=True)
         return emb_matrix, obs_df
 
     def _run_scib_and_log(
