@@ -49,7 +49,7 @@ srun -ul --environment=./bionemo_bristen.toml bash -c "
     --log-interval 100 \
     --conditions technology \
     --where-condition end \
-    --num-workers 8 \
+    --num-workers 24 \
     --training-tasks pcpt \
     --input-emb-style theirs \
     --their-init-weights \
