@@ -450,10 +450,12 @@ class TransformerModule(nn.Module):
         return cell_emb
 
     def _check_condition_labels(self, condition_labels: Optional[Tensor] = None) -> None:
-        """Validates that condition labels are provided if and
-        only if conditions are defined for the model."""
+        """Validates that condition labels are not passed when the
+        model has no conditions defined. Passing no conditions to a
+        model that expects them is allowed (e.g. during inference)."""
         # Use 'is not None' instead of bool() to avoid graph breaks in torch.compile
-        assert (self.conditions is not None) == (condition_labels is not None)
+        if condition_labels is not None:
+            assert self.conditions is not None
 
     def _extend_output(
         self,
