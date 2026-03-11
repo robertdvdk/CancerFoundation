@@ -42,6 +42,8 @@ ACCOUNT = "a132"
 # Baseline config (shared across all experiments)
 # ============================================================
 
+SEEDS = [0, 42]
+
 BASELINE = {
     "max_seq_len": 1200,
     "batch_size": 64,
@@ -49,7 +51,7 @@ BASELINE = {
     "nheads": 8,
     "embsize": 128,
     "d_hid": 256,
-    "epochs": 50,
+    "epochs": 51,
     "lr": 0.0001,
     "warmup_ratio_or_step": 1,
     "trunc_by_sample": True,
@@ -57,7 +59,6 @@ BASELINE = {
     "balance_primary": "technology",
     "zero_percentages": [0.2, 0.4, 0.6],
     "strategy": "ddp",
-    "seed": 0,
     "precision": "bf16-mixed",
     "compile": True,
     "log_interval": 100,
@@ -218,21 +219,28 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     scripts = []
 
-    print(f"Generating {len(EXPERIMENTS)} experiment scripts in {OUT_DIR}/\n")
+    n_total = len(EXPERIMENTS) * len(SEEDS)
+    print(
+        f"Generating {n_total} experiment scripts ({len(EXPERIMENTS)}"
+        " experiments x {len(SEEDS)} seeds) in {OUT_DIR}/\n"
+    )
 
     for name, desc, overrides in EXPERIMENTS:
-        config = make_config(overrides)
-        args_str = format_args(config)
-        script = render(name, desc, args_str)
+        for seed in SEEDS:
+            config = make_config(overrides)
+            config["seed"] = seed
+            args_str = format_args(config)
+            seed_name = f"{name}_seed{seed}"
+            script = render(seed_name, f"{desc} (seed={seed})", args_str)
 
-        path = OUT_DIR / f"{name}.sh"
-        path.write_text(script.lstrip("\n"))
-        path.chmod(path.stat().st_mode | stat.S_IEXEC)
-        scripts.append(path)
+            path = OUT_DIR / f"{seed_name}.sh"
+            path.write_text(script.lstrip("\n"))
+            path.chmod(path.stat().st_mode | stat.S_IEXEC)
+            scripts.append(path)
 
-        # Show what changed from baseline
-        delta = ", ".join(f"{k}={v}" for k, v in overrides.items()) or "(baseline)"
-        print(f"  {path.name:<30s} {delta}")
+            # Show what changed from baseline
+            delta = ", ".join(f"{k}={v}" for k, v in overrides.items()) or "(baseline)"
+            print(f"  {path.name:<40s} seed={seed}, {delta}")
 
     # Generate submit_all.sh
     submit_all = OUT_DIR / "submit_all.sh"
