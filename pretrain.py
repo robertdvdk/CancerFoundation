@@ -79,7 +79,7 @@ def train_model(
     logger = None
 
     # logger = None
-    global_rank = int(os.environ.get("GLOBAL_RANK", "0"))
+    global_rank = int(os.environ.get("GLOBAL_RANK", os.environ.get("RANK", "0")))
     if wandb_project and global_rank == 0:
         logger = WandbLogger(
             entity=wandb_entity,
