@@ -1,0 +1,195 @@
+{
+  "combined": {
+    "total_cells": 3336551,
+    "tissues": {
+      "Breast": {
+        "count": 623011,
+        "percent": 18.67
+      },
+      "Brain": {
+        "count": 562500,
+        "percent": 16.86
+      },
+      "Ovarian": {
+        "count": 363625,
+        "percent": 10.9
+      },
+      "Lung": {
+        "count": 292198,
+        "percent": 8.76
+      },
+      "Skin": {
+        "count": 290734,
+        "percent": 8.71
+      },
+      "Hematologic": {
+        "count": 266512,
+        "percent": 7.99
+      },
+      "Pancreas": {
+        "count": 218358,
+        "percent": 6.54
+      },
+      "Other": {
+        "count": 180147,
+        "percent": 5.4
+      },
+      "Neuroendocrine": {
+        "count": 148983,
+        "percent": 4.47
+      },
+      "Kidney": {
+        "count": 103093,
+        "percent": 3.09
+      },
+      "Head-and-Neck": {
+        "count": 85697,
+        "percent": 2.57
+      },
+      "Sarcoma": {
+        "count": 80347,
+        "percent": 2.41
+      },
+      "Prostate": {
+        "count": 67922,
+        "percent": 2.04
+      },
+      "Colorectal": {
+        "count": 40735,
+        "percent": 1.22
+      },
+      "Liverbiliary": {
+        "count": 12689,
+        "percent": 0.38
+      }
+    }
+  },
+  "per_dataset": {
+    "cancer_gpt": {
+      "total_cells": 994325,
+      "tissues": {
+        "Breast": {
+          "count": 202728,
+          "percent": 20.39
+        },
+        "Hematologic": {
+          "count": 139135,
+          "percent": 13.99
+        },
+        "Skin": {
+          "count": 119398,
+          "percent": 12.01
+        },
+        "Brain": {
+          "count": 110587,
+          "percent": 11.12
+        },
+        "Lung": {
+          "count": 101179,
+          "percent": 10.18
+        },
+        "Ovarian": {
+          "count": 86921,
+          "percent": 8.74
+        },
+        "Neuroendocrine": {
+          "count": 72775,
+          "percent": 7.32
+        },
+        "Pancreas": {
+          "count": 34907,
+          "percent": 3.51
+        },
+        "Sarcoma": {
+          "count": 33459,
+          "percent": 3.36
+        },
+        "Kidney": {
+          "count": 31998,
+          "percent": 3.22
+        },
+        "Prostate": {
+          "count": 28162,
+          "percent": 2.83
+        },
+        "Head-and-Neck": {
+          "count": 17508,
+          "percent": 1.76
+        },
+        "Colorectal": {
+          "count": 11267,
+          "percent": 1.13
+        },
+        "Liverbiliary": {
+          "count": 4301,
+          "percent": 0.43
+        }
+      }
+    },
+    "dataset_pretraining": {
+      "total_cells": 2342226,
+      "tissues": {
+        "Brain": {
+          "count": 451913,
+          "percent": 19.29
+        },
+        "Breast": {
+          "count": 420283,
+          "percent": 17.94
+        },
+        "Ovarian": {
+          "count": 276704,
+          "percent": 11.81
+        },
+        "Lung": {
+          "count": 191019,
+          "percent": 8.16
+        },
+        "Pancreas": {
+          "count": 183451,
+          "percent": 7.83
+        },
+        "Other": {
+          "count": 180147,
+          "percent": 7.69
+        },
+        "Skin": {
+          "count": 171336,
+          "percent": 7.32
+        },
+        "Hematologic": {
+          "count": 127377,
+          "percent": 5.44
+        },
+        "Neuroendocrine": {
+          "count": 76208,
+          "percent": 3.25
+        },
+        "Kidney": {
+          "count": 71095,
+          "percent": 3.04
+        },
+        "Head-and-Neck": {
+          "count": 68189,
+          "percent": 2.91
+        },
+        "Sarcoma": {
+          "count": 46888,
+          "percent": 2.0
+        },
+        "Prostate": {
+          "count": 39760,
+          "percent": 1.7
+        },
+        "Colorectal": {
+          "count": 29468,
+          "percent": 1.26
+        },
+        "Liverbiliary": {
+          "count": 8388,
+          "percent": 0.36
+        }
+      }
+    }
+  }
+}

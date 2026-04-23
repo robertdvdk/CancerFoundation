@@ -11,20 +11,22 @@ python pretrain.py \
     --warmup-ratio-or-step 1 \
     --trunc-by-sample \
     --loss "mse" \
-    --train-path "./DATA/brain/processed_data/train" \
+    --train-path "./DATA/brain_woneftel/processed_data/train" \
     --balance-primary "technology" \
     --zero-percentages 0.2 0.4 0.6 \
     --strategy='auto' \
     --seed 0 \
     --log-interval 50 \
-    --training-tasks "pcpt" \
+    --training-tasks "both" \
     --input-emb-style "theirs" \
     --their-init-weights \
     --num-workers 8 \
     --batch-size 64 \
     --precision "bf16-mixed" \
     --gen-method "quick" \
+    --wandb "brain" \
+    --wandb-name "CancerFoundation_woneftel" \
     --compile \
-    --input-style "normed_raw"
-    # --eval-every-n-epochs 5 \
-    # --eval-datasets DATA/neftel_ss2.h5ad DATA/ji_skin.h5ad DATA/kim_lung.h5ad
+    --input-style "binned" \
+    --eval-every-n-epochs 5 \
+    --eval-datasets DATA/neftel_ss2.h5ad

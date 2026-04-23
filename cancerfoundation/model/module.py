@@ -584,7 +584,7 @@ class TransformerModule(nn.Module):
             gen_expr_preds = output_dict["gen_preds"]
             positions_to_match = ~gen_key_padding_mask
             loss = loss_expr = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
-            loss_dict["loss_expr"] = loss_expr
+            loss_dict["mse"] = loss_expr
 
             if self.do_mvc:
                 mvc_preds_for_gen = output_dict["mvc_output"][:, pcpt_gene.shape[1] :]
@@ -622,7 +622,7 @@ class TransformerModule(nn.Module):
             output_values = output_dict["mlm_output"]
             positions_to_match = ~src_key_padding_mask & (target_values != self.pad_value)
             loss = loss_expr = self.criterion(output_values, target_values, positions_to_match)
-            loss_dict["loss_expr"] = loss_expr
+            loss_dict["mse"] = loss_expr
 
             if self.do_mvc:
                 loss_mvc = self.criterion(
